@@ -1,5 +1,5 @@
-IN: tools.vocabs.tests
-USING: tools.test tools.vocabs namespaces continuations ;
+IN: vocabs.refresh.tests
+USING: vocabs.refresh tools.test continuations namespaces ;
 
 [ ] [
     changed-vocabs get-global

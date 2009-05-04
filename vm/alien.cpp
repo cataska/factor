@@ -10,10 +10,12 @@ char *pinned_alien_offset(cell obj)
 	switch(tagged<object>(obj).type())
 	{
 	case ALIEN_TYPE:
-		alien *ptr = untag<alien>(obj);
-		if(ptr->expired != F)
-			general_error(ERROR_EXPIRED,obj,F,NULL);
-		return pinned_alien_offset(ptr->alien) + ptr->displacement;
+		{
+			alien *ptr = untag<alien>(obj);
+			if(ptr->expired != F)
+				general_error(ERROR_EXPIRED,obj,F,NULL);
+			return pinned_alien_offset(ptr->alien) + ptr->displacement;
+		}
 	case F_TYPE:
 		return NULL;
 	default:
@@ -113,10 +115,10 @@ PRIMITIVE(dlopen)
 {
 	gc_root<byte_array> path(dpop());
 	path.untag_check();
-	gc_root<dll> dll(allot<dll>(sizeof(dll)));
-	dll->path = path.value();
-	ffi_dlopen(dll.untagged());
-	dpush(dll.value());
+	gc_root<dll> library(allot<dll>(sizeof(dll)));
+	library->path = path.value();
+	ffi_dlopen(library.untagged());
+	dpush(library.value());
 }
 
 /* look up a symbol in a native library */
@@ -165,10 +167,12 @@ VM_C_API char *alien_offset(cell obj)
 	case BYTE_ARRAY_TYPE:
 		return untag<byte_array>(obj)->data<char>();
 	case ALIEN_TYPE:
-		alien *ptr = untag<alien>(obj);
-		if(ptr->expired != F)
-			general_error(ERROR_EXPIRED,obj,F,NULL);
-		return alien_offset(ptr->alien) + ptr->displacement;
+		{
+			alien *ptr = untag<alien>(obj);
+			if(ptr->expired != F)
+				general_error(ERROR_EXPIRED,obj,F,NULL);
+			return alien_offset(ptr->alien) + ptr->displacement;
+		}
 	case F_TYPE:
 		return NULL;
 	default:

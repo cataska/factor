@@ -48,21 +48,21 @@ void iterate_relocations(code_block *compiled, relocation_iterator iter)
 }
 
 /* Store a 32-bit value into a PowerPC LIS/ORI sequence */
-static void store_address_2_2(cell *cell, cell value)
+static void store_address_2_2(cell *ptr, cell value)
 {
-	cell[-1] = ((cell[-1] & ~0xffff) | ((value >> 16) & 0xffff));
-	cell[ 0] = ((cell[ 0] & ~0xffff) | (value & 0xffff));
+	ptr[-1] = ((ptr[-1] & ~0xffff) | ((value >> 16) & 0xffff));
+	ptr[ 0] = ((ptr[ 0] & ~0xffff) | (value & 0xffff));
 }
 
 /* Store a value into a bitfield of a PowerPC instruction */
-static void store_address_masked(cell *cell, fixnum value, cell mask, fixnum shift)
+static void store_address_masked(cell *ptr, fixnum value, cell mask, fixnum shift)
 {
 	/* This is unaccurate but good enough */
 	fixnum test = (fixnum)mask >> 1;
 	if(value <= -test || value >= test)
 		critical_error("Value does not fit inside relocation",0);
 
-	*cell = ((*cell & ~mask) | ((value >> shift) & mask));
+	*ptr = ((*ptr & ~mask) | ((value >> shift) & mask));
 }
 
 /* Perform a fixup on a code block */
@@ -218,10 +218,7 @@ void update_word_references(code_block *compiled)
 	   the code heap with dead PICs that will be freed on the next
 	   GC, we add them to the free list immediately. */
 	else if(compiled->block.type == PIC_TYPE)
-	{
-		fflush(stdout);
 		heap_free(&code,&compiled->block);
-	}
 	else
 	{
 		iterate_relocations(compiled,update_word_references_step);
@@ -279,21 +276,27 @@ void mark_object_code_block(object *object)
 	switch(object->h.hi_tag())
 	{
 	case WORD_TYPE:
-		word *w = (word *)object;
-		if(w->code)
-			mark_code_block(w->code);
-		if(w->profiling)
-			mark_code_block(w->profiling);
-		break;
+		{
+			word *w = (word *)object;
+			if(w->code)
+				mark_code_block(w->code);
+			if(w->profiling)
+				mark_code_block(w->profiling);
+			break;
+		}
 	case QUOTATION_TYPE:
-		quotation *q = (quotation *)object;
-		if(q->compiledp != F)
-			mark_code_block(q->code);
-		break;
+		{
+			quotation *q = (quotation *)object;
+			if(q->compiledp != F)
+				mark_code_block(q->code);
+			break;
+		}
 	case CALLSTACK_TYPE:
-		callstack *stack = (callstack *)object;
-		iterate_callstack_object(stack,mark_stack_frame_step);
-		break;
+		{
+			callstack *stack = (callstack *)object;
+			iterate_callstack_object(stack,mark_stack_frame_step);
+			break;
+		}
 	}
 }
 
@@ -318,28 +321,32 @@ void *get_rel_symbol(array *literals, cell index)
 	switch(tagged<object>(symbol).type())
 	{
 	case BYTE_ARRAY_TYPE:
-		symbol_char *name = alien_offset(symbol);
-		void *sym = ffi_dlsym(d,name);
-
-		if(sym)
-			return sym;
-		else
 		{
-			printf("%s\n",name);
-			return (void *)undefined_symbol;
-		}
-	case ARRAY_TYPE:
-		cell i;
-		array *names = untag<array>(symbol);
-		for(i = 0; i < array_capacity(names); i++)
-		{
-			symbol_char *name = alien_offset(array_nth(names,i));
+			symbol_char *name = alien_offset(symbol);
 			void *sym = ffi_dlsym(d,name);
 
 			if(sym)
 				return sym;
+			else
+			{
+				printf("%s\n",name);
+				return (void *)undefined_symbol;
+			}
 		}
-		return (void *)undefined_symbol;
+	case ARRAY_TYPE:
+		{
+			cell i;
+			array *names = untag<array>(symbol);
+			for(i = 0; i < array_capacity(names); i++)
+			{
+				symbol_char *name = alien_offset(array_nth(names,i));
+				void *sym = ffi_dlsym(d,name);
+
+				if(sym)
+					return sym;
+			}
+			return (void *)undefined_symbol;
+		}
 	default:
 		critical_error("Bad symbol specifier",symbol);
 		return (void *)undefined_symbol;
