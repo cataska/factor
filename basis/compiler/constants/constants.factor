@@ -30,18 +30,19 @@ CONSTANT: rc-absolute-cell    0
 CONSTANT: rc-absolute         1
 CONSTANT: rc-relative         2
 CONSTANT: rc-absolute-ppc-2/2 3
-CONSTANT: rc-relative-ppc-2   4
-CONSTANT: rc-relative-ppc-3   5
-CONSTANT: rc-relative-arm-3   6
-CONSTANT: rc-indirect-arm     7
-CONSTANT: rc-indirect-arm-pc  8
+CONSTANT: rc-absolute-ppc-2   4
+CONSTANT: rc-relative-ppc-2   5
+CONSTANT: rc-relative-ppc-3   6
+CONSTANT: rc-relative-arm-3   7
+CONSTANT: rc-indirect-arm     8
+CONSTANT: rc-indirect-arm-pc  9
 
 ! Relocation types
 CONSTANT: rt-primitive   0
 CONSTANT: rt-dlsym       1
 CONSTANT: rt-dispatch    2
 CONSTANT: rt-xt          3
-CONSTANT: rt-xt-direct   4
+CONSTANT: rt-xt-pic      4
 CONSTANT: rt-here        5
 CONSTANT: rt-this        6
 CONSTANT: rt-immediate   7
