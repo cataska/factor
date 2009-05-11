@@ -4,14 +4,14 @@ USING: accessors arrays assocs continuations kernel math models
 namespaces opengl opengl.textures sequences io combinators
 combinators.short-circuit fry math.vectors math.rectangles cache
 ui.gadgets ui.gestures ui.render ui.backend ui.gadgets.tracks
-ui.commands ui.pixel-formats destructors literals ;
+ui.pixel-formats destructors literals ;
 IN: ui.gadgets.worlds
 
 CONSTANT: default-world-pixel-format-attributes
     { windowed double-buffered T{ depth-bits { value 16 } } }
 
 TUPLE: world < track
-    active? focused?
+    active? focused? grab-input?
     layers
     title status status-owner
     text-handle handle images
@@ -20,6 +20,7 @@ TUPLE: world < track
 
 TUPLE: world-attributes
     { world-class initial: world }
+    grab-input?
     title
     status
     gadgets
@@ -63,13 +64,15 @@ M: world request-focus-on ( child gadget -- )
     vertical swap new-track
         t >>root?
         t >>active?
-        { 0 0 } >>window-loc ;
+        { 0 0 } >>window-loc
+        f >>grab-input? ;
 
 : apply-world-attributes ( world attributes -- world )
     {
         [ title>> >>title ]
         [ status>> >>status ]
         [ pixel-format-attributes>> >>pixel-format-attributes ]
+        [ grab-input?>> >>grab-input? ]
         [ gadgets>> [ 1 track-add ] each ]
     } cleave ;
 
