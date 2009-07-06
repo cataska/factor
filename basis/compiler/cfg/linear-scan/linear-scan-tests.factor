@@ -209,6 +209,56 @@ check-assignment? on
 [
     T{ live-interval
         { vreg T{ vreg { reg-class int-regs } { n 1 } } }
+        { start 0 }
+        { end 4 }
+        { uses V{ 0 1 4 } }
+        { ranges V{ T{ live-range f 0 4 } } }
+    }
+    T{ live-interval
+        { vreg T{ vreg { reg-class int-regs } { n 1 } } }
+        { start 5 }
+        { end 10 }
+        { uses V{ 5 10 } }
+        { ranges V{ T{ live-range f 5 10 } } }
+    }
+] [
+    T{ live-interval
+       { vreg T{ vreg { reg-class int-regs } { n 1 } } }
+       { start 0 }
+       { end 10 }
+       { uses V{ 0 1 10 } }
+       { ranges V{ T{ live-range f 0 10 } } }
+    } 5 split-before-use [ f >>split-next ] bi@
+] unit-test
+
+[
+    T{ live-interval
+        { vreg T{ vreg { reg-class int-regs } { n 1 } } }
+        { start 0 }
+        { end 4 }
+        { uses V{ 0 1 4 } }
+        { ranges V{ T{ live-range f 0 4 } } }
+    }
+    T{ live-interval
+        { vreg T{ vreg { reg-class int-regs } { n 1 } } }
+        { start 5 }
+        { end 10 }
+        { uses V{ 5 10 } }
+        { ranges V{ T{ live-range f 5 10 } } }
+    }
+] [
+    T{ live-interval
+       { vreg T{ vreg { reg-class int-regs } { n 1 } } }
+       { start 0 }
+       { end 10 }
+       { uses V{ 0 1 4 5 10 } }
+       { ranges V{ T{ live-range f 0 10 } } }
+    } 5 split-before-use [ f >>split-next ] bi@
+] unit-test
+
+[
+    T{ live-interval
+        { vreg T{ vreg { reg-class int-regs } { n 1 } } }
         { start 3 }
         { end 10 }
         { uses V{ 3 10 } }
@@ -1353,7 +1403,7 @@ USING: math.private ;
 
 ! Spill slot liveness was computed incorrectly, leading to a FEP
 ! early in bootstrap on x86-32
-[ t t ] [
+[ t ] [
     [
         H{ } clone live-ins set
         H{ } clone live-outs set
@@ -1379,8 +1429,7 @@ USING: math.private ;
            }
         } dup 1array { { int-regs V{ 0 1 2 3 } } } (linear-scan)
         instructions>> first
-        [ live-spill-slots>> empty? ]
-        [ live-registers>> empty? ] bi
+        live-values>> assoc-empty?
     ] with-scope
 ] unit-test
 
@@ -1859,4 +1908,196 @@ test-diamond
 
 [ _spill ] [ 3 get instructions>> second class ] unit-test
 
+[ f ] [ 3 get instructions>> [ _reload? ] any? ] unit-test
+
 [ _reload ] [ 4 get instructions>> first class ] unit-test
+
+! Resolve pass
+V{
+    T{ ##branch }
+} 0 test-bb
+
+V{
+    T{ ##peek f V int-regs 0 D 0 }
+    T{ ##compare-imm-branch f V int-regs 0 5 cc= }
+} 1 test-bb
+
+V{
+    T{ ##replace f V int-regs 0 D 0 }
+    T{ ##peek f V int-regs 1 D 0 }
+    T{ ##peek f V int-regs 2 D 0 }
+    T{ ##replace f V int-regs 1 D 0 }
+    T{ ##replace f V int-regs 2 D 0 }
+    T{ ##branch }
+} 2 test-bb
+
+V{
+    T{ ##branch }
+} 3 test-bb
+
+V{
+    T{ ##peek f V int-regs 1 D 0 }
+    T{ ##compare-imm-branch f V int-regs 1 5 cc= }
+} 4 test-bb
+
+V{
+    T{ ##replace f V int-regs 0 D 0 }
+    T{ ##return }
+} 5 test-bb
+
+V{
+    T{ ##replace f V int-regs 0 D 0 }
+    T{ ##return }
+} 6 test-bb
+
+0 get 1 get V{ } 1sequence >>successors drop
+1 get 2 get 3 get V{ } 2sequence >>successors drop
+2 get 4 get V{ } 1sequence >>successors drop
+3 get 4 get V{ } 1sequence >>successors drop
+4 get 5 get 6 get V{ } 2sequence >>successors drop
+
+[ ] [ { 1 2 } test-linear-scan-on-cfg ] unit-test
+
+[ t ] [ 2 get instructions>> [ _spill? ] any? ] unit-test
+
+[ t ] [ 3 get instructions>> [ _spill? ] any? ] unit-test
+
+[ t ] [ 5 get instructions>> [ _reload? ] any? ] unit-test
+
+! A more complicated failure case with resolve that came up after the above
+! got fixed
+V{ T{ ##branch } } 0 test-bb
+V{
+    T{ ##peek f V int-regs 0 D 0 }
+    T{ ##peek f V int-regs 1 D 1 }
+    T{ ##peek f V int-regs 2 D 2 }
+    T{ ##peek f V int-regs 3 D 3 }
+    T{ ##peek f V int-regs 4 D 0 }
+    T{ ##branch }
+} 1 test-bb
+V{ T{ ##branch } } 2 test-bb
+V{ T{ ##branch } } 3 test-bb
+V{
+    
+    T{ ##replace f V int-regs 1 D 1 }
+    T{ ##replace f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 3 D 3 }
+    T{ ##replace f V int-regs 4 D 4 }
+    T{ ##replace f V int-regs 0 D 0 }
+    T{ ##branch }
+} 4 test-bb
+V{ T{ ##replace f V int-regs 0 D 0 } T{ ##branch } } 5 test-bb
+V{ T{ ##return } } 6 test-bb
+V{ T{ ##branch } } 7 test-bb
+V{
+    T{ ##replace f V int-regs 1 D 1 }
+    T{ ##replace f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 3 D 3 }
+    T{ ##peek f V int-regs 5 D 1 }
+    T{ ##peek f V int-regs 6 D 2 }
+    T{ ##peek f V int-regs 7 D 3 }
+    T{ ##peek f V int-regs 8 D 4 }
+    T{ ##replace f V int-regs 5 D 1 }
+    T{ ##replace f V int-regs 6 D 2 }
+    T{ ##replace f V int-regs 7 D 3 }
+    T{ ##replace f V int-regs 8 D 4 }
+    T{ ##branch }
+} 8 test-bb
+V{
+    T{ ##replace f V int-regs 1 D 1 }
+    T{ ##replace f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 3 D 3 }
+    T{ ##return }
+} 9 test-bb
+
+0 get 1 get 1vector >>successors drop
+1 get 2 get 7 get V{ } 2sequence >>successors drop
+7 get 8 get 1vector >>successors drop
+8 get 9 get 1vector >>successors drop
+2 get 3 get 5 get V{ } 2sequence >>successors drop
+3 get 4 get 1vector >>successors drop
+4 get 9 get 1vector >>successors drop
+5 get 6 get 1vector >>successors drop
+
+[ ] [ { 1 2 3 4 } test-linear-scan-on-cfg ] unit-test
+
+[ _spill ] [ 1 get instructions>> second class ] unit-test
+[ _reload ] [ 4 get instructions>> 4 swap nth class ] unit-test
+[ V{ 3 2 1 } ] [ 8 get instructions>> [ _spill? ] filter [ n>> ] map ] unit-test
+[ V{ 3 2 1 } ] [ 9 get instructions>> [ _reload? ] filter [ n>> ] map ] unit-test
+
+! Resolve pass should insert this
+[ _reload ] [ 5 get instructions>> first class ] unit-test
+
+! Some random bug
+V{
+    T{ ##peek f V int-regs 1 D 1 }
+    T{ ##peek f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 1 D 1 }
+    T{ ##replace f V int-regs 2 D 2 }
+    T{ ##peek f V int-regs 3 D 0 }
+    T{ ##peek f V int-regs 0 D 0 }
+    T{ ##branch }
+} 0 test-bb
+
+V{ T{ ##branch } } 1 test-bb
+
+V{
+    T{ ##peek f V int-regs 1 D 1 }
+    T{ ##peek f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 3 D 3 }
+    T{ ##replace f V int-regs 1 D 1 }
+    T{ ##replace f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 0 D 3 }
+    T{ ##branch }
+} 2 test-bb
+
+V{ T{ ##branch } } 3 test-bb
+
+V{
+    T{ ##return }
+} 4 test-bb
+
+test-diamond
+
+[ ] [ { 1 2 } test-linear-scan-on-cfg ] unit-test
+
+! Spilling an interval immediately after its activated;
+! and the interval does not have a use at the activation point
+V{
+    T{ ##peek f V int-regs 1 D 1 }
+    T{ ##peek f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 1 D 1 }
+    T{ ##replace f V int-regs 2 D 2 }
+    T{ ##peek f V int-regs 0 D 0 }
+    T{ ##branch }
+} 0 test-bb
+
+V{ T{ ##branch } } 1 test-bb
+
+V{
+    T{ ##peek f V int-regs 1 D 1 }
+    T{ ##branch }
+} 2 test-bb
+
+V{
+    T{ ##replace f V int-regs 1 D 1 }
+    T{ ##peek f V int-regs 2 D 2 }
+    T{ ##replace f V int-regs 2 D 2 }
+    T{ ##branch }
+} 3 test-bb
+
+V{ T{ ##branch } } 4 test-bb
+
+V{
+    T{ ##replace f V int-regs 0 D 0 }
+    T{ ##return }
+} 5 test-bb
+
+1 get 1vector 0 get (>>successors)
+2 get 4 get V{ } 2sequence 1 get (>>successors)
+5 get 1vector 4 get (>>successors)
+3 get 1vector 2 get (>>successors)
+5 get 1vector 3 get (>>successors)
+
+[ ] [ { 1 2 } test-linear-scan-on-cfg ] unit-test
