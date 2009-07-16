@@ -2,7 +2,7 @@
 ! See http://factorcode.org/license.txt for BSD license.
 USING: help.markup help.syntax kernel quotations words
 alien.inline alien.syntax effects alien.marshall
-alien.marshall.structs strings sequences ;
+alien.marshall.structs strings sequences alien.inline.syntax ;
 IN: alien.marshall.syntax
 
 HELP: CM-FUNCTION:
@@ -12,7 +12,7 @@ HELP: CM-FUNCTION:
 }
 { $examples
   { $example
-    "USING: alien.inline alien.marshall.syntax prettyprint ;"
+    "USING: alien.inline.syntax alien.marshall.syntax prettyprint ;"
     "IN: example"
     ""
     "C-LIBRARY: exlib"
@@ -28,10 +28,8 @@ HELP: CM-FUNCTION:
     ""
     ";C-LIBRARY"
     ""
-    "8 5 0 0 sum_diff .s"
-    "\"sum 13, diff 3\""
-    "13"
-    "3"
+    "8 5 0 0 sum_diff . . ."
+    "3\n13\n\"sum 13, diff 3\""
   }
 }
 { $see-also define-c-marshalled POSTPONE: C-FUNCTION: POSTPONE: M-FUNCTION: } ;
