@@ -21,10 +21,7 @@ compiler.cfg.linear-scan.allocation.splitting
 compiler.cfg.linear-scan.allocation.spilling
 compiler.cfg.linear-scan.debugger ;
 
-FROM: compiler.cfg.linear-scan.assignment => check-assignment? ;
-
 check-allocation? on
-check-assignment? on
 check-numbering? on
 
 [
@@ -1763,11 +1760,6 @@ V{
 test-diamond
 
 [ ] [ { 1 2 } test-linear-scan-on-cfg ] unit-test
-
-[ ] [
-    1 get instructions>> first regs>> V int-regs 0 swap at
-    2 get instructions>> first regs>> V int-regs 1 swap at assert=
-] unit-test
 
 ! Not until splitting is finished
 ! [ _copy ] [ 3 get instructions>> second class ] unit-test
