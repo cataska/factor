@@ -13,17 +13,19 @@ DEFER: *char
 
 : little-endian? ( -- ? ) 1 <int> *char 1 = ; foldable
 
-TUPLE: c-type
+TUPLE: abstract-c-type
 { class class initial: object }
-boxer
 { boxer-quot callable }
-unboxer
 { unboxer-quot callable }
 { getter callable }
 { setter callable }
-{ reg-class initial: int-regs }
 size
-align
+align ;
+
+TUPLE: c-type < abstract-c-type
+boxer
+unboxer
+{ rep initial: int-rep }
 stack-align? ;
 
 : <c-type> ( -- type )
@@ -70,7 +72,7 @@ M: string c-type ( name -- type )
 
 GENERIC: c-type-class ( name -- class )
 
-M: c-type c-type-class class>> ;
+M: abstract-c-type c-type-class class>> ;
 
 M: string c-type-class c-type c-type-class ;
 
@@ -82,7 +84,7 @@ M: string c-type-boxer c-type c-type-boxer ;
 
 GENERIC: c-type-boxer-quot ( name -- quot )
 
-M: c-type c-type-boxer-quot boxer-quot>> ;
+M: abstract-c-type c-type-boxer-quot boxer-quot>> ;
 
 M: string c-type-boxer-quot c-type c-type-boxer-quot ;
 
@@ -94,15 +96,15 @@ M: string c-type-unboxer c-type c-type-unboxer ;
 
 GENERIC: c-type-unboxer-quot ( name -- quot )
 
-M: c-type c-type-unboxer-quot unboxer-quot>> ;
+M: abstract-c-type c-type-unboxer-quot unboxer-quot>> ;
 
 M: string c-type-unboxer-quot c-type c-type-unboxer-quot ;
 
-GENERIC: c-type-reg-class ( name -- reg-class )
+GENERIC: c-type-rep ( name -- rep )
 
-M: c-type c-type-reg-class reg-class>> ;
+M: c-type c-type-rep rep>> ;
 
-M: string c-type-reg-class c-type c-type-reg-class ;
+M: string c-type-rep c-type c-type-rep ;
 
 GENERIC: c-type-getter ( name -- quot )
 
@@ -118,7 +120,7 @@ M: string c-type-setter c-type c-type-setter ;
 
 GENERIC: c-type-align ( name -- n )
 
-M: c-type c-type-align align>> ;
+M: abstract-c-type c-type-align align>> ;
 
 M: string c-type-align c-type c-type-align ;
 
@@ -129,13 +131,11 @@ M: c-type c-type-stack-align? stack-align?>> ;
 M: string c-type-stack-align? c-type c-type-stack-align? ;
 
 : c-type-box ( n type -- )
-    dup c-type-reg-class
-    swap c-type-boxer [ "No boxer" throw ] unless*
+    [ c-type-rep ] [ c-type-boxer [ "No boxer" throw ] unless* ] bi
     %box ;
 
 : c-type-unbox ( n ctype -- )
-    dup c-type-reg-class
-    swap c-type-unboxer [ "No unboxer" throw ] unless*
+    [ c-type-rep ] [ c-type-unboxer [ "No unboxer" throw ] unless* ] bi
     %unbox ;
 
 GENERIC: box-parameter ( n ctype -- )
@@ -169,7 +169,7 @@ GENERIC: heap-size ( type -- size ) foldable
 
 M: string heap-size c-type heap-size ;
 
-M: c-type heap-size size>> ;
+M: abstract-c-type heap-size size>> ;
 
 GENERIC: stack-size ( type -- size ) foldable
 
@@ -426,7 +426,7 @@ CONSTANT: primitive-types
         4 >>align
         "box_float" >>boxer
         "to_float" >>unboxer
-        single-float-regs >>reg-class
+        single-float-rep >>rep
         [ >float ] >>unboxer-quot
     "float" define-primitive-type
 
@@ -438,7 +438,7 @@ CONSTANT: primitive-types
         8 >>align
         "box_double" >>boxer
         "to_double" >>unboxer
-        double-float-regs >>reg-class
+        double-float-rep >>rep
         [ >float ] >>unboxer-quot
     "double" define-primitive-type
 

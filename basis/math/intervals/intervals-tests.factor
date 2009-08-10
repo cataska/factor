@@ -5,6 +5,8 @@ IN: math.intervals.tests
 
 [ empty-interval ] [ 2 2 (a,b) ] unit-test
 
+[ empty-interval ] [ 2 2.0 (a,b) ] unit-test
+
 [ empty-interval ] [ 2 2 [a,b) ] unit-test
 
 [ empty-interval ] [ 2 2 (a,b] ] unit-test
@@ -189,6 +191,10 @@ IN: math.intervals.tests
 
 [ f ] [ 0 10 [a,b] 0 [a,a] interval< ] unit-test
 
+[ f ] [ 0 10 [a,b] 0.0 [a,a] interval< ] unit-test
+
+[ f ] [ 0.0 10 [a,b] 0 [a,a] interval< ] unit-test
+
 [ f ] [ 0 10 [a,b] 10 [a,a] interval> ] unit-test
 
 [ incomparable ] [ 0 [a,a] 0 10 [a,b] interval< ] unit-test
@@ -210,6 +216,10 @@ IN: math.intervals.tests
 ] unit-test
 
 [ t ] [ 1 100 [a,b] -1 1 [a,b] interval/i [-inf,inf] = ] unit-test
+
+! Accuracy of interval-mod
+[ t ] [ full-interval 40 40 [a,b] interval-mod -40 40 (a,b) interval-subset?
+] unit-test
 
 ! Interval random tester
 : random-element ( interval -- n )

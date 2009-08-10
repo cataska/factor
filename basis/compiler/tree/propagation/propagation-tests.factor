@@ -149,6 +149,14 @@ IN: compiler.tree.propagation.tests
     ] final-literals
 ] unit-test
 
+[ V{ t } ] [ [ 40 mod 40 < ] final-literals ] unit-test
+
+[ V{ f } ] [ [ 40 mod 0 >= ] final-literals ] unit-test
+
+[ V{ t } ] [ [ 40 rem 0 >= ] final-literals ] unit-test
+
+[ V{ t } ] [ [ abs 40 mod 0 >= ] final-literals ] unit-test
+
 [ V{ string } ] [
     [ dup string? not [ "Oops" throw ] [ ] if ] final-classes
 ] unit-test
@@ -632,6 +640,10 @@ MIXIN: empty-mixin
     [ { integer } declare 127 bitand ] final-info first interval>>
 ] unit-test
 
+[ V{ t } ] [
+    [ [ 123 bitand ] [ drop f ] if dup [ 0 >= ] [ not ] if ] final-literals
+] unit-test
+  
 [ V{ bignum } ] [
     [ { bignum } declare dup 1- bitxor ] final-classes
 ] unit-test

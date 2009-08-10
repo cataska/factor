@@ -49,7 +49,9 @@ SYMBOL: copies
 : eliminate-copy ( vreg1 vreg2 -- )
     [ leader ] bi@
     2dup eq? [ 2drop ] [
-        [ update-leaders ] [ merge-classes ] 2bi
+        [ update-leaders ]
+        [ merge-classes ]
+        2bi
     ] if ;
 
 : introduce-vreg ( vreg -- )
@@ -95,13 +97,12 @@ M: insn prepare-insn drop ;
     ] each-basic-block ;
 
 : destruct-ssa ( cfg -- cfg' )
-    dup cfg-has-phis? [
-        dup construct-cssa
-        dup compute-defs
-        dup compute-dominance
-        compute-ssa-live-sets
-        dup compute-live-ranges
-        dup prepare-coalescing
-        process-copies
-        dup perform-renaming
-    ] when ;
+    needs-dominance
+
+    dup construct-cssa
+    dup compute-defs
+    compute-ssa-live-sets
+    dup compute-live-ranges
+    dup prepare-coalescing
+    process-copies
+    dup perform-renaming ;
