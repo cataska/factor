@@ -2,7 +2,7 @@
 ! See http://factorcode.org/license.txt for BSD license.
 USING: kernel effects accessors math math.private
 math.integers.private math.partial-dispatch math.intervals
-math.parser math.order layouts words sequences sequences.private
+math.parser math.order math.functions layouts words sequences sequences.private
 arrays assocs classes classes.algebra combinators generic.math
 splitting fry locals classes.tuple alien.accessors
 classes.tuple.private slots.private definitions strings.private
@@ -32,14 +32,20 @@ IN: compiler.tree.propagation.known-words
 
 \ bitnot { integer } "input-classes" set-word-prop
 
-: ?change-interval ( info quot -- quot' )
-    over interval>> [ [ clone ] dip change-interval ] [ 2drop ] if ; inline
+: real-op ( info quot -- quot' )
+    [
+        dup class>> real classes-intersect?
+        [ clone ] [ drop real <class-info> ] if
+    ] dip
+    change-interval ; inline
 
 { bitnot fixnum-bitnot bignum-bitnot } [
-    [ [ interval-bitnot ] ?change-interval ] "outputs" set-word-prop
+    [ [ interval-bitnot ] real-op ] "outputs" set-word-prop
 ] each
 
-\ abs [ [ interval-abs ] ?change-interval ] "outputs" set-word-prop
+\ abs [ [ interval-abs ] real-op ] "outputs" set-word-prop
+
+\ absq [ [ interval-absq ] real-op ] "outputs" set-word-prop
 
 : math-closure ( class -- newclass )
     { fixnum bignum integer rational float real number object }
