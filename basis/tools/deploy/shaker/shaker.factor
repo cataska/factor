@@ -6,7 +6,7 @@ vocabs sequences sequences.private words memory kernel.private
 continuations io vocabs.loader system strings sets vectors quotations
 byte-arrays sorting compiler.units definitions generic
 generic.standard generic.single tools.deploy.config combinators
-classes slots.private ;
+classes classes.builtin slots.private grouping ;
 QUALIFIED: bootstrap.stage2
 QUALIFIED: command-line
 QUALIFIED: compiler.errors
@@ -194,25 +194,64 @@ IN: tools.deploy.shaker
     strip-word-names? [ dup strip-word-names ] when
     2drop ;
 
+: compiler-classes ( -- seq )
+    { "compiler" "stack-checker" }
+    [ child-vocabs [ words ] map concat [ class? ] filter ]
+    map concat unique ;
+
+: prune-decision-tree ( tree classes -- )
+    [ tuple class>type ] 2dip '[
+        dup array? [
+            [
+                dup array? [
+                    [
+                        2 group
+                        [ drop _ key? not ] assoc-filter
+                        concat
+                    ] map
+                ] when
+            ] map
+        ] when
+    ] change-nth ;
+
 : strip-compiler-classes ( -- )
     strip-dictionary? [
         "Stripping compiler classes" show
-        { "compiler" "stack-checker" }
-        [ child-vocabs [ words ] map concat [ class? ] filter ] map concat
-        [ dup implementors [ "methods" word-prop delete-at ] with each ] each
+        [ single-generic? ] instances
+        compiler-classes '[ "decision-tree" word-prop _ prune-decision-tree ] each
     ] when ;
 
+: recursive-subst ( seq old new -- )
+    '[
+        _ _
+        {
+            ! old becomes new
+            { [ 3dup drop eq? ] [ 2nip ] }
+            ! recurse into arrays
+            { [ pick array? ] [ [ dup ] 2dip recursive-subst ] }
+            ! otherwise do nothing
+            [ 2drop ]
+        } cond
+    ] change-each ;
+
+: strip-default-method ( generic new-default -- )
+    [
+        [ "decision-tree" word-prop ]
+        [ "default-method" word-prop ] bi
+    ] dip
+    recursive-subst ;
+
+: new-default-method ( -- gensym )
+    [ [ "No method" throw ] (( -- * )) define-temp ] with-compilation-unit ;
+
 : strip-default-methods ( -- )
+    ! In a development image, each generic has its own default method.
+    ! This gives better error messages for runtime type errors, but
+    ! takes up space. For deployment we merge them all together.
     strip-debugger? [
         "Stripping default methods" show
-        [
-            [ generic? ] instances
-            [ "No method" throw ] (( -- * )) define-temp
-            dup t "default" set-word-prop
-            '[
-                [ _ "default-method" set-word-prop ] [ make-generic ] bi
-            ] each
-        ] with-compilation-unit
+        [ single-generic? ] instances
+        new-default-method '[ _ strip-default-method ] each
     ] when ;
 
 : strip-vocab-globals ( except names -- words )
@@ -361,8 +400,8 @@ IN: tools.deploy.shaker
     [ compress-object? ] [ ] "objects" compress ;
 
 : remain-compiled ( old new -- old new )
-    #! Quotations which were formerly compiled must remain
-    #! compiled.
+    ! Quotations which were formerly compiled must remain
+    ! compiled.
     2dup [
         2dup [ quot-compiled? ] [ quot-compiled? not ] bi* and
         [ nip jit-compile ] [ 2drop ] if
@@ -383,7 +422,9 @@ SYMBOL: deploy-vocab
         [ boot ] %
         init-hooks get values concat %
         strip-debugger? [ , ] [
-            ! Don't reference try directly
+            ! Don't reference 'try' directly since we don't want
+            ! to pull in the debugger and prettyprinter into every
+            ! deployed app
             [:c]
             [print-error]
             '[
@@ -402,22 +443,22 @@ SYMBOL: deploy-vocab
     t "quiet" set-global
     f output-stream set-global ;
 
-: unsafe-next-method-quot ( method -- quot )
+: next-method* ( method -- quot )
     [ "method-class" word-prop ]
     [ "method-generic" word-prop ] bi
-    next-method 1quotation ;
+    next-method ;
 
 : compute-next-methods ( -- )
     [ standard-generic? ] instances [
         "methods" word-prop [
-            nip dup
-            unsafe-next-method-quot
-            "next-method-quot" set-word-prop
+            nip dup next-method* "next-method" set-word-prop
         ] assoc-each
     ] each
     "vocab:tools/deploy/shaker/next-methods.factor" run-file ;
 
 : (clear-megamorphic-cache) ( i array -- )
+    ! Can't do any dispatch while clearing caches since that
+    ! might leave them in an inconsistent state.
     2dup 1 slot < [
         2dup [ f ] 2dip set-array-nth
         [ 1 + ] dip (clear-megamorphic-cache)
@@ -443,8 +484,8 @@ SYMBOL: deploy-vocab
     compute-next-methods
     strip-init-hooks
     strip-c-io
-    strip-compiler-classes
     strip-default-methods
+    strip-compiler-classes
     f 5 setenv ! we can't use the Factor debugger or Factor I/O anymore
     deploy-vocab get vocab-main deploy-boot-quot
     find-megamorphic-caches
