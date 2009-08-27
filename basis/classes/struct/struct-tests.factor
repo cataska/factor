@@ -4,7 +4,9 @@ alien.structs.fields alien.syntax ascii classes.struct combinators
 destructors io.encodings.utf8 io.pathnames io.streams.string
 kernel libc literals math multiline namespaces prettyprint
 prettyprint.config see sequences specialized-arrays.ushort
-system tools.test combinators.short-circuit ;
+system tools.test compiler.tree.debugger struct-arrays
+classes.tuple.private specialized-arrays.direct.int
+compiler.units ;
 IN: classes.struct.tests
 
 <<
@@ -20,6 +22,11 @@ IN: classes.struct.tests
 
 "f-stdcall" libfactor-ffi-tests-path "stdcall" add-library
 >>
+
+SYMBOL: struct-test-empty
+
+[ [ struct-test-empty { } define-struct-class ] with-compilation-unit ]
+[ struct-must-have-slots? ] must-fail-with
 
 STRUCT: struct-test-foo
     { x char }
@@ -178,3 +185,21 @@ STRUCT: struct-test-array-slots
     [ y>> [ 8 3 ] dip set-nth ]
     [ y>> ushort-array{ 2 3 5 8 11 13 } sequence= ] bi
 ] unit-test
+
+STRUCT: struct-test-optimization
+    { x int[3] } { y int } ;
+
+[ t ] [ [ struct-test-optimization memory>struct y>> ] { memory>struct y>> } inlined? ] unit-test
+[ t ] [
+    [ 3 struct-test-optimization <direct-struct-array> third y>> ]
+    { <tuple> <tuple-boa> memory>struct y>> } inlined?
+] unit-test
+
+[ t ] [ [ struct-test-optimization memory>struct y>> ] { memory>struct y>> } inlined? ] unit-test
+
+[ t ] [
+    [ struct-test-optimization memory>struct x>> second ]
+    { memory>struct x>> <direct-int-array> <tuple> <tuple-boa> } inlined?
+] unit-test
+
+[ f ] [ [ memory>struct y>> ] { memory>struct y>> } inlined? ] unit-test
