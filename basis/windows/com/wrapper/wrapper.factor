@@ -3,7 +3,8 @@ init windows.com.syntax.private windows.com continuations kernel
 namespaces windows.ole32 libc vocabs assocs accessors arrays
 sequences quotations combinators math words compiler.units
 destructors fry math.parser generalizations sets
-specialized-arrays.alien specialized-arrays.direct.alien ;
+specialized-arrays.alien specialized-arrays.direct.alien
+windows.kernel32 ;
 IN: windows.com.wrapper
 
 TUPLE: com-wrapper < disposable callbacks vtbls ;
@@ -48,7 +49,7 @@ unless
 : (make-query-interface) ( interfaces -- quot )
     (query-interface-cases) 
     '[
-        swap 16 memory>byte-array
+        swap GUID memory>struct
         _ case
         [
             "void*" heap-size * rot <displaced-alien> com-add-ref

@@ -1,6 +1,6 @@
 ! Copyright (C) 2005, 2008 Slava Pestov.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: alien.syntax alien system ;
+USING: alien.syntax alien system classes.struct ;
 IN: unix
 
 ! Linux.
@@ -84,22 +84,22 @@ CONSTANT: SEEK_SET 0
 CONSTANT: SEEK_CUR 1
 CONSTANT: SEEK_END 2
 
-C-STRUCT: passwd
-    { "char*"  "pw_name" }
-    { "char*"  "pw_passwd" }
-    { "uid_t"  "pw_uid" }
-    { "gid_t"  "pw_gid" }
-    { "char*"  "pw_gecos" }
-    { "char*"  "pw_dir" }
-    { "char*"  "pw_shell" } ;
+STRUCT: passwd
+    { pw_name char* }
+    { pw_passwd char* }
+    { pw_uid uid_t }
+    { pw_gid gid_t }
+    { pw_gecos char* }
+    { pw_dir char* }
+    { pw_shell char* } ;
 
 ! dirent64
-C-STRUCT: dirent
-    { "ulonglong" "d_ino" }
-    { "longlong" "d_off" }
-    { "ushort" "d_reclen" }
-    { "uchar" "d_type" }
-    { { "char" 256 } "d_name" } ;
+STRUCT: dirent
+    { d_ino ulonglong }
+    { d_off longlong }
+    { d_reclen ushort }
+    { d_type uchar }
+    { d_name char[256] } ;
 
 FUNCTION: int open64 ( char* path, int flags, int prot ) ;
 FUNCTION: dirent64* readdir64 ( DIR* dirp ) ;
