@@ -123,6 +123,10 @@ M: x86 %xor-imm nip XOR ;
 M: x86 %shl-imm nip SHL ;
 M: x86 %shr-imm nip SHR ;
 M: x86 %sar-imm nip SAR ;
+
+M: x86 %min     nip [ CMP ] [ CMOVG ] 2bi ;
+M: x86 %max     nip [ CMP ] [ CMOVL ] 2bi ;
+
 M: x86 %not     drop NOT ;
 M: x86 %log2    BSR ;
 
@@ -203,6 +207,8 @@ M: x86 %add-float nip ADDSD ;
 M: x86 %sub-float nip SUBSD ;
 M: x86 %mul-float nip MULSD ;
 M: x86 %div-float nip DIVSD ;
+M: x86 %min-float nip MINSD ;
+M: x86 %max-float nip MAXSD ;
 M: x86 %sqrt SQRTSD ;
 
 M: x86 %integer>float CVTSI2SD ;
@@ -272,7 +278,7 @@ M:: x86 %box-alien ( dst src temp -- )
         "end" resolve-label
     ] with-scope ;
 
-M:: x86 %box-displaced-alien ( dst displacement base temp -- )
+M:: x86 %box-displaced-alien ( dst displacement base displacement' base' -- )
     [
         "end" define-label
         "ok" define-label
@@ -280,17 +286,23 @@ M:: x86 %box-displaced-alien ( dst displacement base temp -- )
         dst base MOV
         displacement 0 CMP
         "end" get JE
+        ! Quickly use displacement' before its needed for real, as allot temporary
+        dst 4 cells alien displacement' %allot
         ! If base is already a displaced alien, unpack it
+        base' base MOV
+        displacement' displacement MOV
         base \ f tag-number CMP
         "ok" get JE
         base header-offset [+] alien type-number tag-fixnum CMP
         "ok" get JNE
         ! displacement += base.displacement
-        displacement base 3 alien@ ADD
+        displacement' base 3 alien@ ADD
         ! base = base.base
-        base base 1 alien@ MOV
+        base' base 1 alien@ MOV
         "ok" resolve-label
-        dst displacement base temp %allot-alien
+        dst 1 alien@ base' MOV ! alien
+        dst 2 alien@ \ f tag-number MOV ! expired
+        dst 3 alien@ displacement' MOV ! displacement
         "end" resolve-label
     ] with-scope ;
 
@@ -572,3 +584,10 @@ M: x86 small-enough? ( n -- ? )
     #! stack frame set up, and we want to read the frame
     #! set up by the caller.
     stack-frame get total-size>> + stack@ ;
+
+: enable-sse2 ( -- )
+    enable-float-intrinsics
+    enable-fsqrt
+    enable-float-min/max ;
+
+enable-min/max

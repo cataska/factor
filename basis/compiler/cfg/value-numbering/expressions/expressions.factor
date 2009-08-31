@@ -12,6 +12,9 @@ TUPLE: commutative-expr < binary-expr ;
 TUPLE: compare-expr < binary-expr cc ;
 TUPLE: constant-expr < expr value ;
 TUPLE: reference-expr < expr value ;
+TUPLE: unary-float-function-expr < expr in func ;
+TUPLE: binary-float-function-expr < expr in1 in2 func ;
+TUPLE: box-displaced-alien-expr < expr displacement base base-class ;
 
 : <constant> ( constant -- expr )
     f swap constant-expr boa ; inline
@@ -84,6 +87,27 @@ M: ##compare >expr compare>expr ;
 M: ##compare-imm >expr compare-imm>expr ;
 
 M: ##compare-float >expr compare>expr ;
+
+M: ##box-displaced-alien >expr
+    {
+        [ class ]
+        [ src1>> vreg>vn ]
+        [ src2>> vreg>vn ]
+        [ base-class>> ]
+    } cleave box-displaced-alien-expr boa ;
+
+M: ##unary-float-function >expr
+    [ class ] [ src>> vreg>vn ] [ func>> ] tri
+    unary-float-function-expr boa ;
+
+M: ##binary-float-function >expr
+    {
+        [ class ]
+        [ src1>> vreg>vn ]
+        [ src2>> vreg>vn ]
+        [ func>> ]
+    } cleave
+    binary-float-function-expr boa ;
 
 M: ##flushable >expr drop next-input-expr ;
 

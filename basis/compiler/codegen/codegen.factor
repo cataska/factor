@@ -149,6 +149,8 @@ M: ##shr     generate-insn dst/src1/src2 %shr     ;
 M: ##shr-imm generate-insn dst/src1/src2 %shr-imm ;
 M: ##sar     generate-insn dst/src1/src2 %sar     ;
 M: ##sar-imm generate-insn dst/src1/src2 %sar-imm ;
+M: ##min     generate-insn dst/src1/src2 %min     ;
+M: ##max     generate-insn dst/src1/src2 %max     ;
 M: ##not     generate-insn dst/src       %not     ;
 M: ##log2    generate-insn dst/src       %log2    ;
 
@@ -169,8 +171,16 @@ M: ##add-float generate-insn dst/src1/src2 %add-float ;
 M: ##sub-float generate-insn dst/src1/src2 %sub-float ;
 M: ##mul-float generate-insn dst/src1/src2 %mul-float ;
 M: ##div-float generate-insn dst/src1/src2 %div-float ;
+M: ##min-float generate-insn dst/src1/src2 %min-float ;
+M: ##max-float generate-insn dst/src1/src2 %max-float ;
 
 M: ##sqrt generate-insn dst/src %sqrt ;
+
+M: ##unary-float-function generate-insn
+    [ dst/src ] [ func>> ] bi %unary-float-function ;
+
+M: ##binary-float-function generate-insn
+    [ dst/src1/src2 ] [ func>> ] bi %binary-float-function ;
 
 M: ##integer>float generate-insn dst/src %integer>float ;
 M: ##float>integer generate-insn dst/src %float>integer ;
@@ -183,7 +193,7 @@ M: ##box-float generate-insn dst/src/temp %box-float ;
 M: ##box-alien generate-insn dst/src/temp %box-alien ;
 
 M: ##box-displaced-alien generate-insn
-    [ dst/src1/src2 ] [ temp>> ] bi %box-displaced-alien ;
+    [ dst/src1/src2 ] [ temp1>> ] [ temp2>> ] tri %box-displaced-alien ;
 
 M: ##alien-unsigned-1 generate-insn dst/src %alien-unsigned-1 ;
 M: ##alien-unsigned-2 generate-insn dst/src %alien-unsigned-2 ;
