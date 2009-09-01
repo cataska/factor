@@ -1,7 +1,9 @@
 ! (c)Joe Groff bsd license
-USING: accessors alien assocs classes classes.struct
-combinators kernel math prettyprint.backend prettyprint.custom
-prettyprint.sections see.private sequences strings words ;
+USING: accessors alien alien.c-types arrays assocs classes
+classes.struct combinators combinators.short-circuit continuations
+fry kernel libc make math math.parser mirrors prettyprint.backend
+prettyprint.custom prettyprint.sections see.private sequences
+slots strings summary words ;
 IN: classes.struct.prettyprint
 
 <PRIVATE
@@ -25,14 +27,15 @@ IN: classes.struct.prettyprint
     \ } pprint-word block> ;
 
 : pprint-struct ( struct -- )
-    [ [ \ S{ ] dip [ class ] [ struct>assoc ] bi \ } (pprint-tuple) ] ?pprint-tuple ;
+    [
+        [ \ S{ ] dip
+        [ class ]
+        [ struct>assoc [ [ name>> ] dip ] assoc-map ] bi
+        \ } (pprint-tuple)
+    ] ?pprint-tuple ;
 
 : pprint-struct-pointer ( struct -- )
-    <block
-    \ S@ pprint-word
-    [ class pprint-word ]
-    [ >c-ptr pprint* ] bi
-    block> ;
+    \ S@ [ [ class pprint-word ] [ >c-ptr pprint* ] bi ] pprint-prefix ;
 
 PRIVATE>
 
@@ -50,3 +53,66 @@ M: struct >pprint-sequence
 M: struct pprint*
     [ pprint-struct ]
     [ pprint-struct-pointer ] pprint-c-object ;
+
+M: struct summary
+    [
+        dup class name>> %
+        " struct of " %
+        byte-length #
+        " bytes " %
+    ] "" make ;
+
+TUPLE: struct-mirror { object read-only } ;
+C: <struct-mirror> struct-mirror
+
+: get-struct-slot ( struct slot -- value present? )
+    over class struct-slots slot-named
+    [ name>> reader-word execute( struct -- value ) t ]
+    [ drop f f ] if* ;
+: set-struct-slot ( value struct slot -- )
+    over class struct-slots slot-named
+    [ name>> writer-word execute( value struct -- ) ]
+    [ 2drop ] if* ;
+: reset-struct-slot ( struct slot -- )
+    over class struct-slots slot-named
+    [ [ initial>> swap ] [ name>> writer-word ] bi execute( value struct -- ) ]
+    [ drop ] if* ;
+: reset-struct-slots ( struct -- )
+    dup class struct-prototype
+    dup byte-length memcpy ;
+
+M: struct-mirror at*
+    object>> {
+        { [ over "underlying" = ] [ nip >c-ptr t ] }
+        { [ over { [ array? ] [ length 1 >= ] } 1&& ] [ swap first get-struct-slot ] }
+        [ 2drop f f ]
+    } cond ;
+
+M: struct-mirror set-at
+    object>> {
+        { [ over "underlying" = ] [ 3drop ] }
+        { [ over array? ] [ swap first set-struct-slot ] }
+        [ 3drop ]
+    } cond ;
+
+M: struct-mirror delete-at
+    object>> {
+        { [ over "underlying" = ] [ 2drop ] }
+        { [ over array? ] [ swap first reset-struct-slot ] }
+        [ 2drop ]
+    } cond ;
+
+M: struct-mirror clear-assoc
+    object>> reset-struct-slots ;
+
+M: struct-mirror >alist ( mirror -- alist )
+    object>> [
+        [ drop "underlying" ] [ >c-ptr ] bi 2array 1array
+    ] [
+        '[
+            _ struct>assoc
+            [ [ [ name>> ] [ c-type>> ] bi 2array ] dip ] assoc-map
+        ] [ drop { } ] recover
+    ] bi append ;
+
+M: struct make-mirror <struct-mirror> ;
