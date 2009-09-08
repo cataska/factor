@@ -28,6 +28,10 @@ specialized-arrays.char specialized-arrays.uint arrays combinators ;
     int-array{ 3 1 3 3 7 } malloc-byte-array 5 <direct-int-array> >array
 ] unit-test
 
+[ f ] [ float-array{ 4 3 2 1 } dup clone [ underlying>> ] bi@ eq? ] unit-test
+
+[ f ] [ [ float-array{ 4 3 2 1 } dup clone [ underlying>> ] bi@ eq? ] compile-call ] unit-test
+
 [ ushort-array{ 0 0 0 } ] [
     3 ALIEN: 123 100 <direct-ushort-array> new-sequence
     dup [ drop 0 ] change-each

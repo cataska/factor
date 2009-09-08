@@ -21,8 +21,10 @@ ERROR: last-insn-not-a-jump bb ;
     dup instructions>> last {
         [ ##branch? ]
         [ ##dispatch? ]
-        [ ##conditional-branch? ]
+        [ ##compare-branch? ]
         [ ##compare-imm-branch? ]
+        [ ##compare-float-ordered-branch? ]
+        [ ##compare-float-unordered-branch? ]
         [ ##fixnum-add? ]
         [ ##fixnum-sub? ]
         [ ##fixnum-mul? ]

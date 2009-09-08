@@ -82,7 +82,7 @@ SYNTAX: A@ scan-object scan-object <direct-A> parsed ;
 
 INSTANCE: A specialized-array
 
-A T c-type-boxed-class specialize-vector-words
+A T c-type-boxed-class f specialize-vector-words
 
 T c-type
     \ A >>array-class
