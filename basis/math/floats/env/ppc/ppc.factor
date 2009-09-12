@@ -5,7 +5,7 @@ IN: math.floats.env.ppc
 
 STRUCT: ppc-fpu-env
     { padding uint }
-    { fpcsr uint } ;
+    { fpscr uint } ;
 
 ! defined in the vm, cpu-ppc*.S
 FUNCTION: void get_ppc_fpu_env ( ppc-fpu-env* env ) ;
@@ -31,14 +31,14 @@ CONSTANT: ppc-exception-flag>bit
         { +fp-inexact+           HEX: 0200,0000 }
     }
 
-CONSTANT: ppc-fp-traps-bits HEX: f80
+CONSTANT: ppc-fp-traps-bits HEX: f8
 CONSTANT: ppc-fp-traps>bit
     H{
-        { +fp-invalid-operation+ HEX: 8000 }
-        { +fp-overflow+          HEX: 4000 }
-        { +fp-underflow+         HEX: 2000 }
-        { +fp-zero-divide+       HEX: 1000 }
-        { +fp-inexact+           HEX: 0800 }
+        { +fp-invalid-operation+ HEX: 80 }
+        { +fp-overflow+          HEX: 40 }
+        { +fp-underflow+         HEX: 20 }
+        { +fp-zero-divide+       HEX: 10 }
+        { +fp-inexact+           HEX: 08 }
     }
 
 CONSTANT: ppc-rounding-mode-bits HEX: 3
@@ -53,27 +53,27 @@ CONSTANT: ppc-rounding-mode>bit
 CONSTANT: ppc-denormal-mode-bits HEX: 4
 
 M: ppc-fpu-env (get-exception-flags) ( register -- exceptions )
-    fpcsr>> ppc-exception-flag>bit mask> ; inline
+    fpscr>> ppc-exception-flag>bit mask> ; inline
 M: ppc-fpu-env (set-exception-flags) ( register exceptions -- register' )
-    [ ppc-exception-flag>bit >mask ppc-exception-flag-bits remask ] curry change-fpcsr ; inline
+    [ ppc-exception-flag>bit >mask ppc-exception-flag-bits remask ] curry change-fpscr ; inline
 
 M: ppc-fpu-env (get-fp-traps) ( register -- exceptions )
-    fpcsr>> not ppc-fp-traps>bit mask> ; inline
+    fpscr>> ppc-fp-traps>bit mask> ; inline
 M: ppc-fpu-env (set-fp-traps) ( register exceptions -- register' )
-    [ ppc-fp-traps>bit >mask not ppc-fp-traps-bits remask ] curry change-fpcsr ; inline
+    [ ppc-fp-traps>bit >mask ppc-fp-traps-bits remask ] curry change-fpscr ; inline
 
 M: ppc-fpu-env (get-rounding-mode) ( register -- mode )
-    fpcsr>> ppc-rounding-mode-bits mask ppc-rounding-mode>bit value-at ; inline
+    fpscr>> ppc-rounding-mode-bits mask ppc-rounding-mode>bit value-at ; inline
 M: ppc-fpu-env (set-rounding-mode) ( register mode -- register' )
-    [ ppc-rounding-mode>bit at ppc-rounding-mode-bits remask ] curry change-fpcsr ; inline
+    [ ppc-rounding-mode>bit at ppc-rounding-mode-bits remask ] curry change-fpscr ; inline
 
 M: ppc-fpu-env (get-denormal-mode) ( register -- mode )
-    fpcsr>> ppc-denormal-mode-bits mask zero? +denormal-keep+ +denormal-flush+ ? ; inline
+    fpscr>> ppc-denormal-mode-bits mask zero? +denormal-keep+ +denormal-flush+ ? ; inline
 M: ppc-fpu-env (set-denormal-mode) ( register mode -- register' )
     [
         {
             { +denormal-keep+  [ ppc-denormal-mode-bits unmask ] }
             { +denormal-flush+ [ ppc-denormal-mode-bits bitor  ] }
         } case
-    ] curry change-fpcsr ; inline
+    ] curry change-fpscr ; inline
 
