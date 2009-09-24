@@ -2,7 +2,7 @@
 ! See http://factorcode.org/license.txt for BSD license.
 USING: math.rectangles math.vectors namespaces kernel accessors
 assocs combinators sequences opengl opengl.gl colors
-colors.constants ui.gadgets ui.pens ;
+colors.constants ui.backend ui.gadgets ui.pens ;
 IN: ui.render
 
 SYMBOL: clip
@@ -34,11 +34,20 @@ SYMBOL: viewport-translation
     GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA glBlendFunc
     GL_VERTEX_ARRAY glEnableClientState
     init-matrices
-    init-clip
-    ! white gl-clear is broken w.r.t window resizing
-    ! Linux/PPC Radeon 9200
-    COLOR: white gl-color
-    { 0 0 } clip get dim>> gl-fill-rect ;
+    init-clip ;
+
+: clear-gl ( transparent? -- )
+    [
+        system-background-color
+        [ red>> ] [ green>> ] [ blue>> ] tri 0.0
+        glClearColor
+        GL_COLOR_BUFFER_BIT glClear
+    ] [
+        ! white gl-clear is broken w.r.t window resizing
+        ! Linux/PPC Radeon 9200
+        COLOR: white gl-color
+        { 0 0 } clip get dim>> gl-fill-rect
+    ] if ;
 
 GENERIC: draw-gadget* ( gadget -- )
 
