@@ -135,8 +135,6 @@ M: ulonglong-2-rep scalar-rep-of drop ulonglong-scalar-rep ;
 ! Mapping from register class to machine registers
 HOOK: machine-registers cpu ( -- assoc )
 
-HOOK: two-operand? cpu ( -- ? )
-
 HOOK: %load-immediate cpu ( reg obj -- )
 HOOK: %load-reference cpu ( reg obj -- )
 
@@ -190,9 +188,6 @@ HOOK: %fixnum-add cpu ( label dst src1 src2 -- )
 HOOK: %fixnum-sub cpu ( label dst src1 src2 -- )
 HOOK: %fixnum-mul cpu ( label dst src1 src2 -- )
 
-HOOK: %integer>bignum cpu ( dst src temp -- )
-HOOK: %bignum>integer cpu ( dst src temp -- )
-
 HOOK: %unbox-float cpu ( dst src -- )
 HOOK: %box-float cpu ( dst src temp -- )
 
@@ -230,12 +225,16 @@ HOOK: %min-vector cpu ( dst src1 src2 rep -- )
 HOOK: %max-vector cpu ( dst src1 src2 rep -- )
 HOOK: %sqrt-vector cpu ( dst src rep -- )
 HOOK: %horizontal-add-vector cpu ( dst src rep -- )
+HOOK: %horizontal-sub-vector cpu ( dst src rep -- )
 HOOK: %abs-vector cpu ( dst src rep -- )
 HOOK: %and-vector cpu ( dst src1 src2 rep -- )
+HOOK: %andn-vector cpu ( dst src1 src2 rep -- )
 HOOK: %or-vector cpu ( dst src1 src2 rep -- )
 HOOK: %xor-vector cpu ( dst src1 src2 rep -- )
 HOOK: %shl-vector cpu ( dst src1 src2 rep -- )
 HOOK: %shr-vector cpu ( dst src1 src2 rep -- )
+HOOK: %horizontal-shl-vector cpu ( dst src1 src2 rep -- )
+HOOK: %horizontal-shr-vector cpu ( dst src1 src2 rep -- )
 
 HOOK: %integer>scalar cpu ( dst src rep -- )
 HOOK: %scalar>integer cpu ( dst src rep -- )
@@ -255,12 +254,16 @@ HOOK: %min-vector-reps cpu ( -- reps )
 HOOK: %max-vector-reps cpu ( -- reps )
 HOOK: %sqrt-vector-reps cpu ( -- reps )
 HOOK: %horizontal-add-vector-reps cpu ( -- reps )
+HOOK: %horizontal-sub-vector-reps cpu ( -- reps )
 HOOK: %abs-vector-reps cpu ( -- reps )
 HOOK: %and-vector-reps cpu ( -- reps )
+HOOK: %andn-vector-reps cpu ( -- reps )
 HOOK: %or-vector-reps cpu ( -- reps )
 HOOK: %xor-vector-reps cpu ( -- reps )
 HOOK: %shl-vector-reps cpu ( -- reps )
 HOOK: %shr-vector-reps cpu ( -- reps )
+HOOK: %horizontal-shl-vector-reps cpu ( -- reps )
+HOOK: %horizontal-shr-vector-reps cpu ( -- reps )
 
 HOOK: %unbox-alien cpu ( dst src -- )
 HOOK: %unbox-any-c-ptr cpu ( dst src temp -- )

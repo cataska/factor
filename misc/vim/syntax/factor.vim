@@ -23,7 +23,7 @@ else
     set iskeyword=!,@,33-35,%,$,38-64,A-Z,91-96,a-z,123-126,128-255
 endif
 
-syn cluster factorCluster contains=factorComment,factorKeyword,factorRepeat,factorConditional,factorBoolean,factorCompileDirective,factorString,factorSbuf,@factorNumber,@factorNumErr,factorDelimiter,factorChar,factorCharErr,factorBackslash,@factorWordOps,factorAlien,factorTuple,factorStruct
+syn cluster factorCluster contains=factorComment,factorKeyword,factorRepeat,factorConditional,factorBoolean,factorCompileDirective,factorString,factorTriString,factorSbuf,@factorNumber,@factorNumErr,factorDelimiter,factorChar,factorCharErr,factorBackslash,@factorWordOps,factorAlien,factorTuple,factorStruct
 
 syn match factorTodo /\(TODO\|FIXME\|XXX\):\=/ contained
 syn match factorComment /\<#!\>.*/ contains=factorTodo
@@ -123,8 +123,9 @@ syn cluster factorWordOps       contains=factorConstant,factorAlias,factorSingle
 " LIBRARY:
 "#\ "
 
-syn region factorString start=/"/ skip=/\\"/ end=/"/ oneline
-syn region factorSbuf start=/SBUF" / skip=/\\"/ end=/"/ oneline
+syn region factorString start=/\<"/ skip=/\\"/ end=/"/
+syn region factorTriString start=/\<"""/ skip=/\\"/ end=/"""/
+syn region factorSbuf start=/\<SBUF"\>/ skip=/\\"/ end=/"/
 
 syn region factorMultiString matchgroup=factorMultiStringDelims start=/\<STRING:\s\+\S\+\>/ end=/^;$/ contains=factorMultiStringContents
 syn match factorMultiStringContents /.*/ contained
@@ -201,6 +202,7 @@ if version >= 508 || !exists("did_factor_syn_inits")
     HiLink factorPGenericDelims         Special
     HiLink factorPGenericNDelims        Special
     HiLink factorString                 String
+    HiLink factorTriString              String
     HiLink factorSbuf                   String
     HiLink factorMultiStringContents    String
     HiLink factorMultiStringDelims      Typedef

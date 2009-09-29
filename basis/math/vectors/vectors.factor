@@ -1,7 +1,7 @@
 ! Copyright (C) 2005, 2009 Slava Pestov.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: arrays alien.c-types kernel sequences math math.functions
-hints math.order math.libm fry combinators ;
+hints math.order math.libm fry combinators byte-arrays accessors ;
 QUALIFIED-WITH: alien.c-types c
 IN: math.vectors
 
@@ -62,9 +62,14 @@ PRIVATE>
         [ drop call ]
     } case ; inline
 
+: bitandn ( x y -- z ) [ bitnot ] dip bitand ; inline
+
+GENERIC: new-underlying ( underlying seq -- seq' )
+
 PRIVATE>
 
 : vbitand ( u v -- w ) over '[ _ [ bitand ] fp-bitwise-op ] 2map ;
+: vbitandn ( u v -- w ) over '[ _ [ bitandn ] fp-bitwise-op ] 2map ;
 : vbitor ( u v -- w ) over '[ _ [ bitor ] fp-bitwise-op ] 2map ;
 : vbitxor ( u v -- w ) over '[ _ [ bitxor ] fp-bitwise-op ] 2map ;
 : vbitnot ( u -- w ) dup '[ _ [ bitnot ] fp-bitwise-unary ] map ;
@@ -85,6 +90,12 @@ PRIVATE>
 
 : vlshift ( u n -- w ) '[ _ shift ] map ;
 : vrshift ( u n -- w ) neg '[ _ shift ] map ;
+
+: hlshift ( u n -- w )
+    [ [ underlying>> ] dip <byte-array> prepend 16 head ] [ drop ] 2bi new-underlying ;
+
+: hrshift ( u n -- w )
+    [ [ underlying>> ] dip <byte-array> append 16 tail* ] [ drop ] 2bi new-underlying ;
 
 : vfloor    ( u -- v ) [ floor ] map ;
 : vceiling  ( u -- v ) [ ceiling ] map ;
