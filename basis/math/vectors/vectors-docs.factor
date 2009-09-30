@@ -1,10 +1,21 @@
 USING: help.markup help.syntax math math.functions sequences ;
 IN: math.vectors
 
-ARTICLE: "math-vectors" "Vector arithmetic"
-"Any Factor sequence can be used to represent a mathematical vector, however for best performance, the sequences defined by the " { $vocab-link "specialized-arrays" } " and " { $vocab-link "math.vectors.simd" } " vocabularies should be used."
-$nl
-"Acting on vectors by a scalar:"
+ARTICLE: "math-vectors-arithmetic" "Vector arithmetic"
+"Vector/vector binary operations:"
+{ $subsection v+ }
+{ $subsection v- }
+{ $subsection v+- }
+{ $subsection v* }
+{ $subsection v/ }
+"Vector unary operations:"
+{ $subsection vneg }
+{ $subsection vabs }
+{ $subsection vsqrt }
+{ $subsection vfloor }
+{ $subsection vceiling }
+{ $subsection vtruncate }
+"Vector/scalar and scalar/vector binary operations:"
 { $subsection vneg }
 { $subsection v*n }
 { $subsection n*v }
@@ -14,26 +25,31 @@ $nl
 { $subsection n+v }
 { $subsection v-n }
 { $subsection n-v }
-"Vector unary operations:"
-{ $subsection vneg }
-{ $subsection vabs }
-{ $subsection vsqrt }
-{ $subsection vfloor }
-{ $subsection vceiling }
-{ $subsection vtruncate }
-"Vector/vector binary operations:"
-{ $subsection v+ }
-{ $subsection v- }
-{ $subsection v+- }
-{ $subsection v* }
-{ $subsection v/ }
 "Saturated arithmetic (only on " { $link "specialized-arrays" } "):"
 { $subsection vs+ }
 { $subsection vs- }
 { $subsection vs* }
-"Comparisons:"
+"Inner product and norm:"
+{ $subsection v. }
+{ $subsection norm }
+{ $subsection norm-sq }
+{ $subsection normalize }
+"Comparing entire vectors:"
+{ $subsection distance }
+{ $subsection v~ } ;
+
+ARTICLE: "math-vectors-logic" "Vector componentwise logic"
+"Element comparisons:"
+{ $subsection v< }
+{ $subsection v<= }
+{ $subsection v= }
+{ $subsection v>= }
+{ $subsection v> }
+{ $subsection vunordered? }
 { $subsection vmax }
 { $subsection vmin }
+{ $subsection vsupremum }
+{ $subsection vinfimum }
 "Bitwise operations:"
 { $subsection vbitand }
 { $subsection vbitandn }
@@ -41,24 +57,28 @@ $nl
 { $subsection vbitxor }
 { $subsection vlshift }
 { $subsection vrshift }
-"Shuffling:"
-{ $subsection vshuffle }
-"Inner product and norm:"
-{ $subsection v. }
-{ $subsection norm }
-{ $subsection norm-sq }
-{ $subsection normalize }
-"Comparing vectors:"
-{ $subsection distance }
-{ $subsection v~ }
-"Other functions:"
-{ $subsection vsupremum }
-{ $subsection vinfimum }
+"Element logical operations:"
+{ $subsection vand }
+{ $subsection vor }
+{ $subsection vxor }
+{ $subsection vmask }
+{ $subsection v? }
+"Element shuffling:"
+{ $subsection vshuffle } ;
+
+ARTICLE: "math-vectors-misc" "Miscellaneous vector functions"
 { $subsection trilerp }
 { $subsection bilerp }
 { $subsection vlerp }
 { $subsection vnlerp }
 { $subsection vbilerp } ;
+
+
+ARTICLE: "math-vectors" "Vector operations"
+"Any Factor sequence can be used to represent a mathematical vector, however for best performance, the sequences defined by the " { $vocab-link "specialized-arrays" } " and " { $vocab-link "math.vectors.simd" } " vocabularies should be used."
+{ $subsection "math-vectors-arithmetic" }
+{ $subsection "math-vectors-logic" }
+{ $subsection "math-vectors-misc" } ;
 
 ABOUT: "math-vectors"
 
@@ -155,12 +175,12 @@ HELP: v/
 
 HELP: vmax
 { $values { "u" "a sequence of real numbers" } { "v" "a sequence of real numbers" } { "w" "a sequence of real numbers" } }
-{ $description "Creates a sequence where each element is the maximum of the corresponding elements from " { $snippet "u" } " andd " { $snippet "v" } "." }
+{ $description "Creates a sequence where each element is the maximum of the corresponding elements from " { $snippet "u" } " and " { $snippet "v" } "." }
 { $examples { $example "USING: math.vectors prettyprint ;" "{ 1 2 5 } { -7 6 3 } vmax ." "{ 1 6 5 }" } } ;
 
 HELP: vmin
 { $values { "u" "a sequence of real numbers" } { "v" "a sequence of real numbers" } { "w" "a sequence of real numbers" } }
-{ $description "Creates a sequence where each element is the minimum of the corresponding elements from " { $snippet "u" } " andd " { $snippet "v" } "." }
+{ $description "Creates a sequence where each element is the minimum of the corresponding elements from " { $snippet "u" } " and " { $snippet "v" } "." }
 { $examples { $example "USING: math.vectors prettyprint ;" "{ 1 2 5 } { -7 6 3 } vmin ." "{ -7 2 3 }" } } ;
 
 HELP: v.
@@ -233,6 +253,18 @@ HELP: hrshift
 { $values { "u" "a SIMD array" } { "n" "a non-negative integer" } { "w" "a SIMD array" } }
 { $description "Shifts the entire SIMD array to the right by " { $snippet "n" } " bytes. This word may only be used in a context where the compiler can statically infer that the input is a SIMD array." } ;
 
+HELP: vbroadcast
+{ $values { "u" "a SIMD array" } { "n" "a non-negative integer" } { "v" "a SIMD array" } }
+{ $description "Outputs a new SIMD array of the same type as " { $snippet "u" } " where every element is equal to the " { $snippet "n" } "th element of " { $snippet "u" } "." }
+{ $examples
+    { $example
+        "USING: alien.c-types math.vectors math.vectors.simd" "prettyprint ;"
+        "SIMD: int"
+        "int-4{ 69 42 911 13 } 2 vbroadcast ."
+        "int-4{ 911 911 911 911 }"
+    }
+} ;
+
 HELP: vshuffle
 { $values { "u" "a SIMD array" } { "perm" "an array of integers" } { "v" "a SIMD array" } }
 { $description "Permutes the elements of a SIMD array. Duplicate entries are allowed in the permutation." }
@@ -266,8 +298,60 @@ HELP: set-axis
 { $description "Using " { $snippet "w" } " as a template, creates a new sequence containing corresponding elements from " { $snippet "u" } " in place of 0, and corresponding elements from " { $snippet "v" } " in place of 1." }
 { $examples { $example "USING: math.vectors prettyprint ;" "{ 1 2 3 } { 4 5 6 } { 0 1 0 } set-axis ." "{ 1 5 3 }" } } ;
 
+HELP: v<
+{ $values { "u" "a sequence of numbers" } { "v" "a sequence of numbers" } { "w" "a sequence of booleans" } }
+{ $description "Compares each corresponding element of " { $snippet "u" } " and " { $snippet "v" } ", returning " { $link t } " in the result vector when the former is less than the latter or " { $link f } " otherwise." } ;
+
+HELP: v<=
+{ $values { "u" "a sequence of numbers" } { "v" "a sequence of numbers" } { "w" "a sequence of booleans" } }
+{ $description "Compares each corresponding element of " { $snippet "u" } " and " { $snippet "v" } ", returning " { $link t } " in the result vector when the former is less than or equal to the latter or " { $link f } " otherwise." } ;
+
+HELP: v=
+{ $values { "u" "a sequence of numbers" } { "v" "a sequence of numbers" } { "w" "a sequence of booleans" } }
+{ $description "Compares each corresponding element of " { $snippet "u" } " and " { $snippet "v" } ", returning " { $link t } " in the result vector when they are equal or " { $link f } " otherwise." } ;
+
+HELP: v>
+{ $values { "u" "a sequence of numbers" } { "v" "a sequence of numbers" } { "w" "a sequence of booleans" } }
+{ $description "Compares each corresponding element of " { $snippet "u" } " and " { $snippet "v" } ", returning " { $link t } " in the result vector when the former is greater than the latter or " { $link f } " otherwise." } ;
+
+HELP: v>=
+{ $values { "u" "a sequence of numbers" } { "v" "a sequence of numbers" } { "w" "a sequence of booleans" } }
+{ $description "Compares each corresponding element of " { $snippet "u" } " and " { $snippet "v" } ", returning " { $link t } " in the result vector when the former is greater than or equal to the latter or " { $link f } " otherwise." } ;
+
+HELP: vunordered?
+{ $values { "u" "a sequence of numbers" } { "v" "a sequence of numbers" } { "w" "a sequence of booleans" } }
+{ $description "Compares each corresponding element of " { $snippet "u" } " and " { $snippet "v" } ", returning " { $link t } " in the result vector when either value is Not-a-Number or " { $link f } " otherwise." } ;
+
+HELP: vand
+{ $values { "u" "a sequence of booleans" } { "v" "a sequence of booleans" } { "w" "a sequence of booleans" } }
+{ $description "Takes the logical AND of each corresponding element of " { $snippet "u" } " and " { $snippet "v" } "." } ;
+
+HELP: vor
+{ $values { "u" "a sequence of booleans" } { "v" "a sequence of booleans" } { "w" "a sequence of booleans" } }
+{ $description "Takes the logical OR of each corresponding element of " { $snippet "u" } " and " { $snippet "v" } "." } ;
+
+HELP: vxor
+{ $values { "u" "a sequence of booleans" } { "v" "a sequence of booleans" } { "w" "a sequence of booleans" } }
+{ $description "Takes the logical XOR of each corresponding element of " { $snippet "u" } " and " { $snippet "v" } "." } ;
+
+HELP: vnot
+{ $values { "u" "a sequence of booleans" } { "w" "a sequence of booleans" } }
+{ $description "Takes the logical NOT of each element of " { $snippet "u" } "." } ;
+
+HELP: vmask
+{ $values { "u" "a sequence of numbers" } { "?" "a sequence of booleans" } { "u'" "a sequence of numbers" } }
+{ $description "Returns a copy of " { $snippet "u" } " with the elements for which the corresponding element of " { $snippet "?" } " is false replaced by zero." } ;
+
+HELP: v?
+{ $values { "?" "a sequence of booleans" } { "true" "a sequence of numbers" } { "false" "a sequence of numbers" } { "w" "a sequence of numbers" } }
+{ $description "Creates a new sequence by selecting elements from the " { $snippet "true" } " and " { $snippet "false" } " sequences based on whether the corresponding element of the " { $snippet "?" } " sequence is true or false." } ;
+
 { 2map v+ v- v* v/ } related-words
 
 { 2reduce v. } related-words
 
 { vs+ vs- vs* } related-words
+
+{ v< v<= v= v> v>= vunordered? vand vor vxor vnot vmask v? } related-words
+
+{ vbitand vbitandn vbitor vbitxor vbitnot } related-words
