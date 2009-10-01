@@ -230,12 +230,6 @@ M: ppc %copy ( dst src rep -- )
         } case
     ] if ;
 
-M: ppc %unbox-float ( dst src -- ) float-offset LFD ;
-
-M:: ppc %box-float ( dst src temp -- )
-    dst 16 float temp %allot
-    src dst float-offset STFD ;
-
 GENERIC: float-function-param* ( dst src -- )
 
 M: spill-slot float-function-param* [ 1 ] dip n>> spill@ LFD ;
@@ -386,24 +380,24 @@ M:: ppc %box-displaced-alien ( dst displacement base displacement' base' base-cl
         "end" resolve-label
     ] with-scope ;
 
-M: ppc %alien-unsigned-1 0 LBZ ;
-M: ppc %alien-unsigned-2 0 LHZ ;
+M: ppc %alien-unsigned-1 LBZ ;
+M: ppc %alien-unsigned-2 LHZ ;
 
-M: ppc %alien-signed-1 dupd 0 LBZ dup EXTSB ;
-M: ppc %alien-signed-2 0 LHA ;
+M: ppc %alien-signed-1 [ dup ] 2dip LBZ dup EXTSB ;
+M: ppc %alien-signed-2 LHA ;
 
-M: ppc %alien-cell 0 LWZ ;
+M: ppc %alien-cell LWZ ;
 
-M: ppc %alien-float 0 LFS ;
-M: ppc %alien-double 0 LFD ;
+M: ppc %alien-float LFS ;
+M: ppc %alien-double LFD ;
 
-M: ppc %set-alien-integer-1 swap 0 STB ;
-M: ppc %set-alien-integer-2 swap 0 STH ;
+M: ppc %set-alien-integer-1 -rot STB ;
+M: ppc %set-alien-integer-2 -rot STH ;
 
-M: ppc %set-alien-cell swap 0 STW ;
+M: ppc %set-alien-cell -rot STW ;
 
-M: ppc %set-alien-float swap 0 STFS ;
-M: ppc %set-alien-double swap 0 STFD ;
+M: ppc %set-alien-float -rot STFS ;
+M: ppc %set-alien-double -rot STFD ;
 
 : load-zone-ptr ( reg -- )
     "nursery" %load-vm-field-addr ;

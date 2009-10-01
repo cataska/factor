@@ -317,12 +317,18 @@ M:: x86 %set-string-nth-fast ( ch str index temp -- )
 : %alien-unsigned-getter ( dst src offset size -- )
     [ MOVZX ] %alien-integer-getter ; inline
 
+: %alien-signed-getter ( dst src offset size -- )
+    [ MOVSX ] %alien-integer-getter ; inline
+
+:: %alien-integer-setter ( ptr offset value size -- )
+    value { ptr } size [| new-value |
+        new-value value int-rep %copy
+        ptr offset [+] new-value size n-bit-version-of MOV
+    ] with-small-register ; inline
+
 M: x86 %alien-unsigned-1 8 %alien-unsigned-getter ;
 M: x86 %alien-unsigned-2 16 %alien-unsigned-getter ;
 M: x86 %alien-unsigned-4 32 [ 2drop ] %alien-integer-getter ;
-
-: %alien-signed-getter ( dst src offset size -- )
-    [ MOVSX ] %alien-integer-getter ; inline
 
 M: x86 %alien-signed-1 8 %alien-signed-getter ;
 M: x86 %alien-signed-2 16 %alien-signed-getter ;
@@ -332,12 +338,6 @@ M: x86 %alien-cell [+] MOV ;
 M: x86 %alien-float [+] MOVSS ;
 M: x86 %alien-double [+] MOVSD ;
 M: x86 %alien-vector [ [+] ] dip %copy ;
-
-:: %alien-integer-setter ( ptr offset value size -- )
-    value { ptr } size [| new-value |
-        new-value value int-rep %copy
-        ptr offset [+] new-value size n-bit-version-of MOV
-    ] with-small-register ; inline
 
 M: x86 %set-alien-integer-1 8 %alien-integer-setter ;
 M: x86 %set-alien-integer-2 16 %alien-integer-setter ;
@@ -474,13 +474,6 @@ M: x86 %double>single-float CVTSD2SS ;
 M: x86 %integer>float CVTSI2SD ;
 M: x86 %float>integer CVTTSD2SI ;
 
-M: x86 %unbox-float ( dst src -- )
-    float-offset [+] MOVSD ;
-
-M:: x86 %box-float ( dst src temp -- )
-    dst 16 float temp %allot
-    dst float-offset [+] src MOVSD ;
-
 : %cmov-float= ( dst src -- )
     [
         "no-move" define-label
@@ -560,16 +553,6 @@ M: x86 %compare-float-ordered-branch ( label src1 src2 cc -- )
 
 M: x86 %compare-float-unordered-branch ( label src1 src2 cc -- )
     \ UCOMISD (%compare-float-branch) ;
-
-M:: x86 %box-vector ( dst src rep temp -- )
-    dst rep rep-size 2 cells + byte-array temp %allot
-    16 tag-fixnum dst 1 byte-array tag-number %set-slot-imm
-    dst byte-array-offset [+]
-    src rep %copy ;
-
-M:: x86 %unbox-vector ( dst src rep -- )
-    dst src byte-array-offset [+]
-    rep %copy ;
 
 MACRO: available-reps ( alist -- )
     ! Each SSE version adds new representations and supports
@@ -1045,8 +1028,20 @@ M: x86 %shr-vector-reps
 : scalar-sized-reg ( reg rep -- reg' )
     rep-size 8 * n-bit-version-of ;
 
-M: x86 %integer>scalar scalar-sized-reg MOVD ;
-M: x86 %scalar>integer swap [ scalar-sized-reg ] dip MOVD ;
+M: x86 %integer>scalar drop MOVD ;
+
+M:: x86 %scalar>integer ( dst src rep -- )
+    rep {
+        { int-scalar-rep [
+            dst 32-bit-version-of src MOVD
+            dst dst 32-bit-version-of
+            2dup eq? [ 2drop ] [ MOVSX ] if
+        ] }
+        { uint-scalar-rep [
+            dst 32-bit-version-of src MOVD
+        ] }
+    } case ;
+
 M: x86 %vector>scalar %copy ;
 M: x86 %scalar>vector %copy ;
 
