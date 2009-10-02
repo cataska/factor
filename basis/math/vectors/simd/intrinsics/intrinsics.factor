@@ -44,11 +44,19 @@ SIMD-OP: vbitand
 SIMD-OP: vbitandn
 SIMD-OP: vbitor
 SIMD-OP: vbitxor
+SIMD-OP: vand
+SIMD-OP: vandn
+SIMD-OP: vor
+SIMD-OP: vxor
 SIMD-OP: vlshift
 SIMD-OP: vrshift
 SIMD-OP: hlshift
 SIMD-OP: hrshift
 SIMD-OP: vshuffle
+SIMD-OP: v=
+SIMD-OP: vany?
+SIMD-OP: vall?
+SIMD-OP: vnone?
 
 : (simd-with) ( x rep -- v ) bad-simd-call ;
 : (simd-gather-2) ( a b rep -- v ) bad-simd-call ;
@@ -121,11 +129,19 @@ M: vector-rep supported-simd-op?
         { \ (simd-vbitandn) [ %andn-vector-reps           ] }
         { \ (simd-vbitor)   [ %or-vector-reps             ] }
         { \ (simd-vbitxor)  [ %xor-vector-reps            ] }
+        { \ (simd-vand)     [ %and-vector-reps            ] }
+        { \ (simd-vandn)    [ %andn-vector-reps           ] }
+        { \ (simd-vor)      [ %or-vector-reps             ] }
+        { \ (simd-vxor)     [ %xor-vector-reps            ] }
         { \ (simd-vlshift)  [ %shl-vector-reps            ] }
         { \ (simd-vrshift)  [ %shr-vector-reps            ] }
         { \ (simd-hlshift)  [ %horizontal-shl-vector-reps ] }
         { \ (simd-hrshift)  [ %horizontal-shr-vector-reps ] }
         { \ (simd-vshuffle) [ %shuffle-vector-reps        ] }
+        { \ (simd-v=)       [ %compare-vector-reps        ] }
         { \ (simd-gather-2) [ %gather-vector-2-reps       ] }
         { \ (simd-gather-4) [ %gather-vector-4-reps       ] }
+        { \ (simd-vany?)    [ %test-vector-reps           ] }
+        { \ (simd-vall?)    [ %test-vector-reps           ] }
+        { \ (simd-vnone?)   [ %test-vector-reps           ] }
     } case member? ;
