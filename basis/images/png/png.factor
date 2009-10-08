@@ -4,6 +4,7 @@ USING: accessors arrays checksums checksums.crc32 combinators
 compression.inflate fry grouping images images.loader io
 io.binary io.encodings.ascii io.encodings.string kernel locals
 math math.bitwise math.ranges sequences sorting ;
+QUALIFIED-WITH: bitstreams bs
 IN: images.png
 
 SINGLETON: png-image
@@ -25,6 +26,9 @@ CONSTANT: truecolor 2
 CONSTANT: indexed-color 3
 CONSTANT: greyscale-alpha 4
 CONSTANT: truecolor-alpha 6
+
+CONSTANT: interlace-none 0
+CONSTANT: interlace-adam7 1
 
 : <loading-png> ( -- image )
     loading-png new
@@ -54,7 +58,7 @@ ERROR: bad-checksum ;
     4 read = [ bad-checksum ] unless
     4 cut-slice
     [ ascii decode >>type ] [ B{ } like >>data ] bi*
-    [ over chunks>> push ] 
+    [ over chunks>> push ]
     [ type>> ] bi "IEND" =
     [ read-png-chunks ] unless ;
 
@@ -80,23 +84,24 @@ ERROR: unknown-color-type n ;
 ERROR: unimplemented-color-type image ;
 
 : inflate-data ( loading-png -- bytes )
-    find-compressed-bytes zlib-inflate ; 
+    find-compressed-bytes zlib-inflate ;
 
-: scale-bit-depth ( loading-png -- n ) bit-depth>> 8 / ; inline
-
-: png-bytes-per-pixel ( loading-png -- n )
-    dup color-type>> {
-        { 2 [ scale-bit-depth 3 * ] }
-        { 6 [ scale-bit-depth 4 * ] }
+: png-components-per-pixel ( loading-png -- n )
+    color-type>> {
+        { greyscale [ 1 ] }
+        { truecolor [ 3 ] }
+        { greyscale-alpha [ 2 ] }
+        { truecolor-alpha [ 4 ] }
         [ unknown-color-type ]
     } case ; inline
 
 : png-group-width ( loading-png -- n )
     ! 1 + is for the filter type, 1 byte preceding each line
-    [ png-bytes-per-pixel ] [ width>> ] bi * 1 + ;
+    [ [ png-components-per-pixel ] [ bit-depth>> ] bi * ]
+    [ width>> ] bi * 1 + ;
 
-:: paeth ( a b c -- p ) 
-    a b + c - { a b c } [ [ - abs ] keep 2array ] with map 
+:: paeth ( a b c -- p )
+    a b + c - { a b c } [ [ - abs ] keep 2array ] with map
     sort-keys first second ;
 
 :: png-unfilter-line ( width prev curr filter -- curr' )
@@ -111,44 +116,92 @@ ERROR: unimplemented-color-type image ;
         { filter-up [ [| n | n x nth n b nth + 256 wrap n x set-nth ] each ] }
         { filter-average [ [| n | n x nth n a nth n b nth + 2/ + 256 wrap n x set-nth ] each ] }
         { filter-paeth [ [| n | n x nth n a nth n b nth n c nth paeth + 256 wrap n x set-nth ] each ] }
-    } case 
+    } case
     curr width tail ;
 
-:: reverse-png-filter ( n lines -- byte-array )
+:: reverse-png-filter ( lines n -- byte-array )
     lines dup first length 0 <array> prefix
     [ n 1 - 0 <array> prepend ] map
     2 clump [
-        n swap first2 [ ] [ n 1 - swap nth ] [ [ 0 n 1 - ] dip set-nth ] tri
+        n swap first2
+        [ ]
+        [ n 1 - swap nth ]
+        [ [ 0 n 1 - ] dip set-nth ] tri
         png-unfilter-line
     ] map B{ } concat-as ;
 
-: png-image-bytes ( loading-png -- byte-array )
-    [ png-bytes-per-pixel ]
-    [ inflate-data ]
-    [ png-group-width ] tri group reverse-png-filter ;
+ERROR: unimplemented-interlace ;
 
-: loading-png>image ( loading-png -- image )
-    [ image new ] dip {
-        [ png-image-bytes >>bitmap ]
-        [ [ width>> ] [ height>> ] bi 2array >>dim ]
-        [ drop ubyte-components >>component-type ]
-    } cleave ;
+: reverse-interlace ( byte-array loading-png -- bitstream )
+    {
+        { interlace-none [ ] }
+        { interlace-adam7 [ unimplemented-interlace ] }
+        [ unimplemented-interlace ]
+    } case bs:<msb0-bit-reader> ;
 
-: decode-greyscale ( loading-png -- image )
-    unimplemented-color-type ;
+: uncompress-bytes ( loading-png -- bitstream )
+    [ inflate-data ] [ interlace-method>> ] bi reverse-interlace ;
 
-: decode-truecolor ( loading-png -- image )
-    loading-png>image RGB >>component-order ;
-    
-: decode-indexed-color ( loading-png -- image )
-    unimplemented-color-type ;
+:: raw-bytes ( loading-png -- array )
+    loading-png uncompress-bytes :> bs
+    loading-png width>> :> width
+    loading-png height>> :> height
+    loading-png png-components-per-pixel :> #components
+    loading-png bit-depth>> :> bit-depth
+    bit-depth :> depth!
+    #components width * :> count!
 
-: decode-greyscale-alpha ( loading-png -- image )
-    unimplemented-color-type ;
+    ! Only read up to 8 bits at a time
+    bit-depth 16 = [
+        8 depth!
+        count 2 * count!
+    ] when
 
-: decode-truecolor-alpha ( loading-png -- image )
-    loading-png>image RGBA >>component-order ;
+    height [
+        8 bs bs:read
+        count [ depth bs bs:read ] replicate swap prefix
+    ] replicate
+    #components bit-depth 16 = [ 2 * ] when reverse-png-filter ;
 
+ERROR: unknown-component-type n ;
+
+: png-component ( loading-png -- obj )
+    bit-depth>> {
+        { 1 [ ubyte-components ] }
+        { 2 [ ubyte-components ] }
+        { 4 [ ubyte-components ] }
+        { 8 [ ubyte-components ] }
+        { 16 [ ushort-components ] }
+        [ unknown-component-type ]
+    } case ;
+
+: scale-factor ( n -- n' )
+    {
+        { 1 [ 255 ] }
+        { 2 [ 127 ] }
+        { 4 [ 17 ] }
+        { 8 [ 1 ] }
+    } case ;
+
+: scale-greyscale ( byte-array loading-png -- byte-array' )
+    [ bit-depth>> ] [ color-type>> ] bi {
+        { greyscale [
+            dup 16 = [
+                drop
+            ] [
+                scale-factor '[ _ * ] B{ } map-as
+            ] if
+        ] }
+        { greyscale-alpha [
+            [ 8 group ] dip '[
+                [ [ 0 5 ] dip <slice> [ _ * ] change-each ] keep
+            ] map B{ } concat-as
+        ] }
+    } case ;
+
+: decode-greyscale ( loading-png -- byte-array )
+    [ raw-bytes ] keep scale-greyscale ;
+ 
 ERROR: invalid-color-type/bit-depth loading-png ;
 
 : validate-bit-depth ( loading-png seq -- loading-png )
@@ -170,15 +223,32 @@ ERROR: invalid-color-type/bit-depth loading-png ;
 : validate-truecolor-alpha ( loading-png -- loading-png )
     { 8 16 } validate-bit-depth ;
 
-: png>image ( loading-png -- image )
+: loading-png>bitmap ( loading-png -- bytes component-order )
     dup color-type>> {
-        { greyscale [ validate-greyscale decode-greyscale ] }
-        { truecolor [ validate-truecolor decode-truecolor ] }
-        { indexed-color [ validate-indexed-color decode-indexed-color ] }
-        { greyscale-alpha [ validate-greyscale-alpha decode-greyscale-alpha ] }
-        { truecolor-alpha [ validate-truecolor-alpha decode-truecolor-alpha ] }
+        { greyscale [
+            validate-greyscale decode-greyscale L
+        ] }
+        { truecolor [
+            validate-truecolor raw-bytes RGB
+        ] }
+        { indexed-color [
+            validate-indexed-color unimplemented-color-type
+        ] }
+        { greyscale-alpha [
+            validate-greyscale-alpha decode-greyscale LA
+        ] }
+        { truecolor-alpha [
+            validate-truecolor-alpha raw-bytes RGBA
+        ] }
         [ unknown-color-type ]
     } case ;
+
+: loading-png>image ( loading-png -- image )
+    [ image new ] dip {
+        [ loading-png>bitmap [ >>bitmap ] [ >>component-order ] bi* ]
+        [ [ width>> ] [ height>> ] bi 2array >>dim ]
+        [ png-component >>component-type ]
+    } cleave ;
 
 : load-png ( stream -- loading-png )
     [
@@ -189,4 +259,4 @@ ERROR: invalid-color-type/bit-depth loading-png ;
     ] with-input-stream ;
 
 M: png-image stream>image
-    drop load-png png>image ;
+    drop load-png loading-png>image ;
