@@ -159,13 +159,14 @@ IN: compiler.cfg.intrinsics
         { math.vectors.simd.intrinsics:(simd-v+-) [ [ ^^add-sub-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-v-) [ [ ^^sub-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-vs-) [ [ ^^saturated-sub-vector ] emit-binary-vector-op ] }
+        { math.vectors.simd.intrinsics:(simd-vneg) [ [ generate-neg-vector ] emit-unary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-v*) [ [ ^^mul-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-vs*) [ [ ^^saturated-mul-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-v/) [ [ ^^div-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-vmin) [ [ ^^min-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-vmax) [ [ ^^max-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-v.) [ [ ^^dot-vector ] emit-binary-vector-op ] }
-        { math.vectors.simd.intrinsics:(simd-vabs) [ [ ^^abs-vector ] emit-unary-vector-op ] }
+        { math.vectors.simd.intrinsics:(simd-vabs) [ [ generate-abs-vector ] emit-unary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-vsqrt) [ [ ^^sqrt-vector ] emit-unary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-vbitand) [ [ ^^and-vector ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-vbitandn) [ [ ^^andn-vector ] emit-binary-vector-op ] }
@@ -193,7 +194,8 @@ IN: compiler.cfg.intrinsics
         { math.vectors.simd.intrinsics:(simd-with) [ [ ^^with-vector ] emit-unary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-gather-2) [ emit-gather-vector-2 ] }
         { math.vectors.simd.intrinsics:(simd-gather-4) [ emit-gather-vector-4 ] }
-        { math.vectors.simd.intrinsics:(simd-vshuffle) [ emit-shuffle-vector ] }
+        { math.vectors.simd.intrinsics:(simd-vshuffle-elements) [ emit-shuffle-vector ] }
+        { math.vectors.simd.intrinsics:(simd-vshuffle-bytes) [ emit-shuffle-vector-var ] }
         { math.vectors.simd.intrinsics:(simd-(vmerge-head)) [ [ ^^merge-vector-head ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-(vmerge-tail)) [ [ ^^merge-vector-tail ] emit-binary-vector-op ] }
         { math.vectors.simd.intrinsics:(simd-(v>float)) [ [ ^^integer>float-vector ] emit-unary-vector-op ] }

@@ -1,4 +1,4 @@
-! Copyright (C) 2008, 2009 Slava Pestov, Doug Coleman.
+! Copyright (C) 2008, 2009 Slava Pestov, Doug Coleman, Daniel Ehrenberg.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors combinators combinators.short-circuit arrays
 fry kernel layouts math namespaces sequences cpu.architecture
@@ -242,6 +242,28 @@ M: ##shl-imm constant-fold* drop shift ;
     [ [ src1>> vreg>constant ] [ src2>> ] [ ] tri constant-fold* ] bi
     \ ##load-immediate new-insn ; inline
 
+: unary-constant-fold? ( insn -- ? )
+    src>> vreg>expr constant-expr? ; inline
+
+GENERIC: unary-constant-fold* ( x insn -- y )
+
+M: ##not unary-constant-fold* drop bitnot ;
+M: ##neg unary-constant-fold* drop neg ;
+
+: unary-constant-fold ( insn -- insn' )
+    [ dst>> ]
+    [ [ src>> vreg>constant ] [ ] bi unary-constant-fold* ] bi
+    \ ##load-immediate new-insn ; inline
+
+: maybe-unary-constant-fold ( insn -- insn' )
+    dup unary-constant-fold? [ unary-constant-fold ] [ drop f ] if ;
+
+M: ##neg rewrite
+    maybe-unary-constant-fold ;
+
+M: ##not rewrite
+    maybe-unary-constant-fold ;
+
 : reassociate ( insn op -- insn )
     [
         {
@@ -428,26 +450,26 @@ M: ##set-alien-vector rewrite rewrite-alien-addressing ;
 ! Some lame constant folding for SIMD intrinsics. Eventually this
 ! should be redone completely.
 
-: rewrite-shuffle-vector ( insn expr -- insn' )
+: rewrite-shuffle-vector-imm ( insn expr -- insn' )
     2dup [ rep>> ] bi@ eq? [
         [ [ dst>> ] [ src>> vn>vreg ] bi* ]
         [ [ shuffle>> ] bi@ nths ]
         [ drop rep>> ]
-        2tri \ ##shuffle-vector new-insn
+        2tri \ ##shuffle-vector-imm new-insn
     ] [ 2drop f ] if ;
 
-: (fold-shuffle-vector) ( shuffle bytes -- bytes' )
+: (fold-shuffle-vector-imm) ( shuffle bytes -- bytes' )
     2dup length swap length /i group nths concat ;
 
-: fold-shuffle-vector ( insn expr -- insn' )
+: fold-shuffle-vector-imm ( insn expr -- insn' )
     [ [ dst>> ] [ shuffle>> ] bi ] dip value>>
-    (fold-shuffle-vector) \ ##load-constant new-insn ;
+    (fold-shuffle-vector-imm) \ ##load-constant new-insn ;
 
-M: ##shuffle-vector rewrite
+M: ##shuffle-vector-imm rewrite
     dup src>> vreg>expr {
-        { [ dup shuffle-vector-expr? ] [ rewrite-shuffle-vector ] }
-        { [ dup reference-expr? ] [ fold-shuffle-vector ] }
-        { [ dup constant-expr? ] [ fold-shuffle-vector ] }
+        { [ dup shuffle-vector-imm-expr? ] [ rewrite-shuffle-vector-imm ] }
+        { [ dup reference-expr? ] [ fold-shuffle-vector-imm ] }
+        { [ dup constant-expr? ] [ fold-shuffle-vector-imm ] }
         [ 2drop f ]
     } cond ;
 

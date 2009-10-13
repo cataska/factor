@@ -1,13 +1,17 @@
 ! Copyright (C) 2009 Slava Pestov.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors byte-arrays fry cpu.architecture kernel math
-sequences math.vectors.simd.intrinsics macros generalizations
-combinators combinators.short-circuit arrays locals
+USING: accessors alien byte-arrays fry classes.algebra
+cpu.architecture kernel math sequences math.vectors
+math.vectors.simd.intrinsics macros generalizations combinators
+combinators.short-circuit arrays locals
 compiler.tree.propagation.info compiler.cfg.builder.blocks
 compiler.cfg.comparisons
 compiler.cfg.stacks compiler.cfg.stacks.local compiler.cfg.hats
 compiler.cfg.instructions compiler.cfg.registers
-compiler.cfg.intrinsics.alien ;
+compiler.cfg.intrinsics.alien
+specialized-arrays ;
+FROM: alien.c-types => heap-size char uchar float double ;
+SPECIALIZED-ARRAYS: float double ;
 IN: compiler.cfg.intrinsics.simd
 
 MACRO: check-elements ( quots -- )
@@ -18,7 +22,7 @@ MACRO: check-elements ( quots -- )
 
 MACRO: if-literals-match ( quots -- )
     [ length ] [ ] [ length ] tri
-    ! n quots n n
+    ! n quots n
     '[
         ! node quot
         [
@@ -74,15 +78,41 @@ MACRO: if-literals-match ( quots -- )
 
 : shuffle? ( obj -- ? ) { [ array? ] [ [ integer? ] all? ] } 1&& ;
 
-: emit-shuffle-vector ( node -- )
-    ! Pad the permutation with zeroes if its too short, since we
+: >variable-shuffle ( shuffle rep -- shuffle' )
+    rep-component-type heap-size
+    [ dup <repetition> >byte-array ]
+    [ iota >byte-array ] bi
+    '[ _ n*v _ v+ ] map concat ;
+
+: generate-shuffle-vector-imm ( src shuffle rep -- dst )
+    dup %shuffle-vector-imm-reps member?
+    [ ^^shuffle-vector-imm ]
+    [
+        [ >variable-shuffle ^^load-constant ] keep
+        ^^shuffle-vector
+    ] if ;
+
+: emit-shuffle-vector-imm ( node -- )
+    ! Pad the permutation with zeroes if it's too short, since we
     ! can't throw an error at this point.
-    [ [ rep-components 0 pad-tail ] keep ^^shuffle-vector ] [unary/param]
+    [ [ rep-components 0 pad-tail ] keep generate-shuffle-vector-imm ] [unary/param]
     { [ shuffle? ] [ representation? ] } if-literals-match ;
+
+: emit-shuffle-vector-var ( node -- )
+    [ ^^shuffle-vector ] [binary]
+    { [ %shuffle-vector-reps member? ] } if-literals-match ;
+
+: emit-shuffle-vector ( node -- )
+    dup node-input-infos {
+        [ length 3 = ]
+        [ first  class>> byte-array class<= ]
+        [ second class>> byte-array class<= ]
+        [ third  literal>> representation?  ]
+    } 1&& [ emit-shuffle-vector-var ] [ emit-shuffle-vector-imm ] if ;
 
 : ^^broadcast-vector ( src n rep -- dst )
     [ rep-components swap <array> ] keep
-    ^^shuffle-vector ;
+    generate-shuffle-vector-imm ;
 
 : emit-broadcast-vector ( node -- )
     [ ^^broadcast-vector ] [unary/param]
@@ -98,6 +128,9 @@ MACRO: if-literals-match ( quots -- )
     [ ^^select-vector ] [unary/param]
     { [ integer? ] [ representation? ] } if-literals-match ; inline
 
+: emit-alien-vector-op ( node quot: ( rep -- ) -- )
+    { [ %alien-vector-reps member? ] } if-literals-match ; inline
+
 : emit-alien-vector ( node -- )
     dup [
         '[
@@ -105,7 +138,7 @@ MACRO: if-literals-match ( quots -- )
             _ ^^alien-vector ds-push
         ]
         [ inline-alien-getter? ] inline-alien
-    ] with emit-vector-op ;
+    ] with emit-alien-vector-op ;
 
 : emit-set-alien-vector ( node -- )
     dup [
@@ -115,7 +148,7 @@ MACRO: if-literals-match ( quots -- )
         ]
         [ byte-array inline-alien-setter? ]
         inline-alien
-    ] with emit-vector-op ;
+    ] with emit-alien-vector-op ;
 
 : generate-not-vector ( src rep -- dst )
     dup %not-vector-reps member?
@@ -175,5 +208,46 @@ MACRO: if-literals-match ( quots -- )
             zero src rep cc> ^^compare-vector :> sign
             src sign rep ^^merge-vector-tail
         ] 
+    } cond ;
+
+:: generate-load-neg-zero-vector ( rep -- dst )
+    rep {
+        { float-4-rep [ float-array{ -0.0 -0.0 -0.0 -0.0 } underlying>> ^^load-constant ] }
+        { double-2-rep [ double-array{ -0.0 -0.0 } underlying>> ^^load-constant ] }
+        [ drop rep ^^zero-vector ]
+    } case ;
+
+:: generate-neg-vector ( src rep -- dst )
+    rep generate-load-neg-zero-vector
+    src rep ^^sub-vector ;
+
+:: generate-blend-vector ( mask true false rep -- dst )
+    mask true rep ^^and-vector
+    mask false rep ^^andn-vector
+    rep ^^or-vector ;
+
+:: generate-abs-vector ( src rep -- dst )
+    {
+        {
+            [ rep unsigned-int-vector-rep? ]
+            [ src ]
+        }
+        {
+            [ rep %abs-vector-reps member? ]
+            [ src rep ^^abs-vector ]
+        }
+        {
+            [ rep float-vector-rep? ]
+            [
+                rep generate-load-neg-zero-vector
+                src rep ^^andn-vector
+            ]
+        }
+        [ 
+            rep ^^zero-vector :> zero
+            zero src rep ^^sub-vector :> -src
+            zero src rep cc> ^^compare-vector :> sign 
+            sign -src src rep generate-blend-vector
+        ]
     } cond ;
 
