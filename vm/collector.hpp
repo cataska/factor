@@ -6,14 +6,16 @@ template<typename TargetGeneration, typename Policy> struct collector {
 	data_heap *data;
 	code_heap *code;
 	gc_state *current_gc;
+	generation_statistics *stats;
 	TargetGeneration *target;
 	Policy policy;
 
-	explicit collector(factor_vm *myvm_, TargetGeneration *target_, Policy policy_) :
+	explicit collector(factor_vm *myvm_, generation_statistics *stats_, TargetGeneration *target_, Policy policy_) :
 		myvm(myvm_),
 		data(myvm_->data),
 		code(myvm_->code),
 		current_gc(myvm_->current_gc),
+		stats(stats_),
 		target(target_),
 		policy(policy_) {}
 
@@ -30,15 +32,15 @@ template<typename TargetGeneration, typename Policy> struct collector {
 		return untagged;
 	}
 
-	bool trace_handle(cell *handle)
+	void trace_handle(cell *handle)
 	{
 		cell pointer = *handle;
 
-		if(immediate_p(pointer)) return false;
+		if(immediate_p(pointer)) return;
 
 		object *untagged = myvm->untag<object>(pointer);
 		if(!policy.should_copy_p(untagged))
-			return false;
+			return;
 
 		object *forwarding = resolve_forwarding(untagged);
 
@@ -50,24 +52,18 @@ template<typename TargetGeneration, typename Policy> struct collector {
 			untagged = forwarding;
 
 		*handle = RETAG(untagged,TAG(pointer));
-
-		return true;
 	}
 
-	bool trace_slots(object *ptr)
+	void trace_slots(object *ptr)
 	{
 		cell *slot = (cell *)ptr;
 		cell *end = (cell *)((cell)ptr + myvm->binary_payload_start(ptr));
 
-		bool copied = false;
-
 		if(slot != end)
 		{
 			slot++;
-			for(; slot < end; slot++) copied |= trace_handle(slot);
+			for(; slot < end; slot++) trace_handle(slot);
 		}
-
-		return copied;
 	}
 
 	object *promote_object(object *untagged)
@@ -80,7 +76,6 @@ template<typename TargetGeneration, typename Policy> struct collector {
 		memcpy(newpointer,untagged,size);
 		untagged->h.forward_to(newpointer);
 
-		generation_statistics *stats = &myvm->gc_stats.generations[current_gc->collecting_gen];
 		stats->object_count++;
 		stats->bytes_copied += size;
 

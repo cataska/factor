@@ -211,9 +211,9 @@ void factor_vm::dump_memory(cell from, cell to)
 		dump_cell(from);
 }
 
-void factor_vm::dump_zone(cell gen, zone *z)
+void factor_vm::dump_zone(char *name, zone *z)
 {
-	print_string("Generation "); print_cell(gen); print_string(": ");
+	print_string(name); print_string(": ");
 	print_string("Start="); print_cell(z->start);
 	print_string(", size="); print_cell(z->size);
 	print_string(", here="); print_cell(z->here - z->start); nl();
@@ -221,9 +221,9 @@ void factor_vm::dump_zone(cell gen, zone *z)
 
 void factor_vm::dump_generations()
 {
-	dump_zone(nursery_gen,&nursery);
-	dump_zone(aging_gen,data->aging);
-	dump_zone(tenured_gen,data->tenured);
+	dump_zone("Nursery",&nursery);
+	dump_zone("Aging",data->aging);
+	dump_zone("Tenured",data->tenured);
 
 	print_string("Cards: base=");
 	print_cell((cell)data->cards);
@@ -346,8 +346,6 @@ void factor_vm::factorbug()
 	print_string(".s .r .c         -- print data, retain, call stacks\n");
 	print_string("e                -- dump environment\n");
 	print_string("g                -- dump generations\n");
-	print_string("card <addr>      -- print card containing address\n");
-	print_string("addr <card>      -- print address containing card\n");
 	print_string("data             -- data heap dump\n");
 	print_string("words            -- words dump\n");
 	print_string("tuples           -- tuples dump\n");
@@ -423,18 +421,6 @@ void factor_vm::factorbug()
 		}
 		else if(strcmp(cmd,"g") == 0)
 			dump_generations();
-		else if(strcmp(cmd,"card") == 0)
-		{
-			cell addr = read_cell_hex();
-			print_cell_hex((cell)addr_to_card(addr));
-			nl();
-		}
-		else if(strcmp(cmd,"addr") == 0)
-		{
-			card *ptr = (card *)read_cell_hex();
-			print_cell_hex(card_to_addr(ptr));
-			nl();
-		}
 		else if(strcmp(cmd,"q") == 0)
 			return;
 		else if(strcmp(cmd,"x") == 0)
