@@ -189,10 +189,8 @@ struct stack_frame_printer {
 void factor_vm::print_callstack()
 {
 	print_string("==== CALL STACK:\n");
-	cell bottom = (cell)stack_chain->callstack_bottom;
-	cell top = (cell)stack_chain->callstack_top;
 	stack_frame_printer printer(this);
-	iterate_callstack(top,bottom,printer);
+	iterate_callstack(ctx,printer);
 }
 
 void factor_vm::dump_cell(cell x)
@@ -211,7 +209,7 @@ void factor_vm::dump_memory(cell from, cell to)
 		dump_cell(from);
 }
 
-void factor_vm::dump_zone(char *name, zone *z)
+void factor_vm::dump_zone(const char *name, zone *z)
 {
 	print_string(name); print_string(": ");
 	print_string("Start="); print_cell(z->start);
@@ -234,7 +232,7 @@ void factor_vm::dump_generations()
 
 void factor_vm::dump_objects(cell type)
 {
-	gc();
+	primitive_full_gc();
 	begin_scan();
 
 	cell obj;

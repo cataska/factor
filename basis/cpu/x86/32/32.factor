@@ -25,6 +25,18 @@ M: x86.32 rs-reg EDI ;
 M: x86.32 stack-reg ESP ;
 M: x86.32 temp-reg ECX ;
 
+M: x86.32 %mark-card
+    drop HEX: ffffffff [+] card-mark <byte> MOV
+    building get pop
+    rc-absolute-cell rel-cards-offset
+    building get push ;
+
+M: x86.32 %mark-deck
+    drop HEX: ffffffff [+] card-mark <byte> MOV
+    building get pop
+    rc-absolute-cell rel-decks-offset
+    building get push ;
+
 M:: x86.32 %dispatch ( src temp -- )
     ! Load jump table base.
     temp src HEX: ffffffff [+] LEA
@@ -108,11 +120,9 @@ M: x86.32 %save-param-reg 3drop ;
     #! parameter being passed to a callback from C.
     over [ load-return-reg ] [ 2drop ] if ;
 
-CONSTANT: vm-ptr-size 4
-
 M:: x86.32 %box ( n rep func -- )
     n rep (%box)
-    rep rep-size vm-ptr-size + [
+    rep rep-size cell + [
         push-vm-ptr
         rep push-return-reg
         func f %alien-invoke
@@ -126,7 +136,7 @@ M:: x86.32 %box ( n rep func -- )
 
 M: x86.32 %box-long-long ( n func -- )
     [ (%box-long-long) ] dip
-    8 vm-ptr-size + [
+    12 [
         push-vm-ptr
         EDX PUSH
         EAX PUSH
@@ -136,7 +146,7 @@ M: x86.32 %box-long-long ( n func -- )
 M:: x86.32 %box-large-struct ( n c-type -- )
     ! Compute destination address
     EDX n struct-return@ LEA
-    8 vm-ptr-size + [
+    12 [
         push-vm-ptr
         ! Push struct size
         c-type heap-size PUSH
@@ -154,7 +164,7 @@ M: x86.32 %prepare-box-struct ( -- )
 
 M: x86.32 %box-small-struct ( c-type -- )
     #! Box a <= 8-byte struct returned in EAX:EDX. OS X only.
-    12 vm-ptr-size + [
+    16 [
         push-vm-ptr
         heap-size PUSH
         EDX PUSH
@@ -196,7 +206,7 @@ M: x86.32 %unbox-long-long ( n func -- )
 
 : %unbox-struct-1 ( -- )
     #! Alien must be in EAX.
-    4 vm-ptr-size + [
+    8 [
         push-vm-ptr
         EAX PUSH
         "alien_offset" f %alien-invoke
@@ -206,7 +216,7 @@ M: x86.32 %unbox-long-long ( n func -- )
 
 : %unbox-struct-2 ( -- )
     #! Alien must be in EAX.
-    4 vm-ptr-size + [
+    8 [
         push-vm-ptr
         EAX PUSH
         "alien_offset" f %alien-invoke
@@ -227,7 +237,7 @@ M:: x86.32 %unbox-large-struct ( n c-type -- )
     ! Alien must be in EAX.
     ! Compute destination address
     EDX n stack@ LEA
-    12 vm-ptr-size + [
+    16 [
         push-vm-ptr
         ! Push struct size
         c-type heap-size PUSH
@@ -240,8 +250,11 @@ M:: x86.32 %unbox-large-struct ( n c-type -- )
     ] with-aligned-stack ;
 
 M: x86.32 %nest-stacks ( -- )
-    4 [
+    8 [
         push-vm-ptr
+        ! Save current frame. See comment in vm/contexts.hpp
+        EAX stack-reg stack-frame get total-size>> [+] LEA
+        EAX PUSH
         "nest_stacks" f %alien-invoke
     ] with-aligned-stack ;
 

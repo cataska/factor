@@ -1,6 +1,6 @@
 ! (c)Joe Groff bsd license
-USING: alien.data.map fry generalizations kernel math.vectors
-math.vectors.conversion math math.vectors.simd
+USING: alien.data.map fry generalizations kernel locals math.vectors
+math.vectors.conversion math math.vectors.simd sequences
 specialized-arrays tools.test ;
 FROM: alien.c-types => uchar short int float ;
 SIMDS: float int short uchar ;
@@ -13,11 +13,40 @@ IN: alien.data.map.tests
     byte-array>float-array
 ] unit-test
 
+[
+    float-4-array{
+        float-4{ 0.0 0.0 0.0 0.0 }
+        float-4{ 1.0 1.0 1.0 1.0 }
+        float-4{ 2.0 2.0 2.0 2.0 }
+    }
+] [
+    3 iota [ float-4-with ] data-map( object -- float-4 )
+    byte-array>float-4-array
+] unit-test
+
+[
+    float-4-array{
+        float-4{ 0.0 1.0  2.0  3.0 }
+        float-4{ 4.0 5.0  6.0  7.0 }
+        float-4{ 8.0 9.0 10.0 11.0 }
+    }
+] [
+    12 iota [ float-4-boa ] data-map( object[4] -- float-4 )
+    byte-array>float-4-array
+] unit-test
+
 [ float-array{ 1.0 1.0 3.0 3.0 5.0 5.0 0.0 0.0 } ]
 [
     int-array{ 1 3 5 } float-array{ 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 }
     [ dup ] data-map!( int -- float[2] )
 ] unit-test
+
+:: float-pixels>byte-pixels-locals ( floats scale bias -- bytes )
+    floats [
+        [ scale 255.0 * v*n bias 255.0 * v+n float-4 int-4 vconvert ] 4 napply
+        [ int-4 short-8 vconvert ] 2bi@
+        short-8 uchar-16 vconvert
+    ] data-map( float-4[4] -- uchar-16 ) ; inline
 
 : float-pixels>byte-pixels* ( floats scale bias -- bytes )
     '[
@@ -28,6 +57,22 @@ IN: alien.data.map.tests
 
 : float-pixels>byte-pixels ( floats -- bytes )
     1.0 0.0 float-pixels>byte-pixels* ;
+
+[
+    B{
+        127 191 255 63
+        255 25 51 76
+        76 51 229 127
+        25 255 255 255
+    } 
+] [
+    float-array{
+        0.5 0.75 1.0 0.25
+        1.0 0.1 0.2 0.3
+        0.3 0.2 0.9 0.5
+        0.1 1.0 1.5 2.0
+    } 1.0 0.0 float-pixels>byte-pixels-locals
+] unit-test
 
 [
     B{
@@ -69,9 +114,11 @@ IN: alien.data.map.tests
 : vmerge-transpose ( a b c d -- ac bd ac bd )
     [ (vmerge) ] bi-curry@ bi* ; inline
 
+CONSTANT: plane-count 4
+
 : fold-rgba-planes ( r g b a -- rgba )
     [ vmerge-transpose vmerge-transpose ]
-    data-map( uchar-16 uchar-16 uchar-16 uchar-16 -- uchar-16[4] ) ;
+    data-map( uchar-16 uchar-16 uchar-16 uchar-16 -- uchar-16[plane-count] ) ;
 
 [
     B{

@@ -12,6 +12,7 @@ to_tenured_collector::to_tenured_collector(factor_vm *myvm_) :
 
 void factor_vm::collect_to_tenured()
 {
+	/* Copy live objects from aging space to tenured space. */
 	to_tenured_collector collector(this);
 
 	collector.trace_roots();
@@ -21,7 +22,7 @@ void factor_vm::collect_to_tenured()
 		dummy_unmarker());
 	collector.trace_code_heap_roots(&code->points_to_aging);
 	collector.cheneys_algorithm();
-	update_dirty_code_blocks(&code->points_to_aging);
+	update_code_heap_for_minor_gc(&code->points_to_aging);
 
 	nursery.here = nursery.start;
 	reset_generation(data->aging);

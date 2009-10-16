@@ -1,10 +1,9 @@
 ! (c)Joe Groff bsd license
 USING: accessors alien alien.c-types alien.data alien.parser arrays
-byte-arrays combinators effects.parser fry generalizations kernel
-lexer locals macros math math.ranges parser sequences sequences.private ;
+byte-arrays combinators effects.parser fry generalizations grouping kernel
+lexer locals macros make math math.ranges parser sequences sequences.private ;
+FROM: alien.arrays => array-length ;
 IN: alien.data.map
-
-ERROR: bad-data-map-input-length byte-length iter-size remainder ;
 
 <PRIVATE
 
@@ -20,8 +19,6 @@ TUPLE: data-map-param
     { iter-length fixnum read-only }
     { iter-count fixnum read-only } ;
 
-ERROR: bad-data-map-param param remainder ;
-
 M: data-map-param length
     iter-count>> ; inline
 
@@ -35,40 +32,58 @@ M: data-map-param nth-unsafe
 
 INSTANCE: data-map-param immutable-sequence
 
-: c-type-count ( in/out -- c-type count iter-length )
-    dup array? [ unclip swap product >fixnum ] [ 1 ] if
-    2dup swap heap-size * >fixnum ; inline
+: c-type-count ( in/out -- c-type count )
+    dup array? [ unclip swap array-length >fixnum ] [ 1 ] if ; inline
 
-MACRO:: >param ( in -- quot: ( array -- param ) )
-    in c-type-count :> iter-length :> count :> c-type
+: c-type-iter-length ( c-type count -- iter-length )
+    swap heap-size * >fixnum ; inline
 
-    [
-        [ c-type count ] dip
+: [>c-type-param] ( c-type count -- quot )
+    2dup c-type-iter-length '[
+        [ _ _ ] dip
         [ ]
         [ >c-ptr ]
         [ byte-length ] tri
-        iter-length
+        _
         2dup /i
         data-map-param boa
     ] ;
 
-MACRO:: alloc-param ( out -- quot: ( len -- param ) )
-    out c-type-count :> iter-length :> count :> c-type
+: [>object-param] ( class count -- quot )
+    nip '[ _ <sliced-groups> ] ;
 
-    [
-        [ c-type count ] dip
+: [>param] ( type -- quot )
+    c-type-count over c-type-name?
+    [ [>c-type-param] ] [ [>object-param] ] if ; 
+
+MACRO: >param ( in -- quot: ( array -- param ) )
+    [>param] ;
+
+: [alloc-c-type-param] ( c-type count -- quot )
+    2dup c-type-iter-length dup '[
+        [ _ _ ] dip
         [
-            iter-length * >fixnum [ (byte-array) dup ] keep
-            iter-length
+            _ * >fixnum [ (byte-array) dup ] keep
+            _
         ] keep
         data-map-param boa
     ] ;
 
+: [alloc-object-param] ( type count -- quot )
+    "Factor sequences as data-map outputs not supported" throw ;
+
+: [alloc-param] ( type -- quot )
+    c-type-count over c-type-name?
+    [ [alloc-c-type-param] ] [ [alloc-object-param] ] if ; 
+
+MACRO: alloc-param ( out -- quot: ( len -- param ) )
+    [alloc-param] ;
+
 MACRO: unpack-params ( ins -- )
-    [ c-type-count drop nip '[ _ firstn-unsafe ] ] map '[ _ spread ] ;
+    [ c-type-count nip '[ _ firstn-unsafe ] ] map '[ _ spread ] ;
 
 MACRO: pack-params ( outs -- )
-    [ ] [ c-type-count drop nip dup [ [ ndip _ ] dip set-firstn ] 3curry ] reduce
+    [ ] [ c-type-count nip dup [ [ ndip _ ] dip set-firstn ] 3curry ] reduce
     fry [ call ] compose ;
 
 :: [data-map] ( ins outs param-quot -- quot )
@@ -76,14 +91,17 @@ MACRO: pack-params ( outs -- )
     outs length :> #outs
     #ins #outs + :> #params
 
-    [| quot |
-        param-quot call
+    [
+        param-quot %
         [
-            [ [ ins unpack-params quot call ] #outs ndip outs pack-params ]
-            #params neach
-        ] #outs nkeep
-        [ orig>> ] #outs napply
-    ] ;
+            [
+                [ ins , \ unpack-params , \ @ , ] [ ] make ,
+                #outs , \ ndip , outs , \ pack-params ,
+            ] [ ] make ,
+            #params , \ neach ,
+        ] [ ] make , #outs , \ nkeep ,
+        [ orig>> ] , #outs , \ napply ,
+    ] [ ] make fry \ call suffix ;
 
 MACRO: data-map ( ins outs -- )
     2dup
@@ -99,8 +117,8 @@ MACRO: data-map! ( ins outs -- )
 
 : parse-data-map-effect ( accum -- accum )
     ")" parse-effect
-    [ in>>  [ parse-c-type ] map parsed ]
-    [ out>> [ parse-c-type ] map parsed ] bi ;
+    [ in>>  [ (parse-c-type) ] map parsed ]
+    [ out>> [ (parse-c-type) ] map parsed ] bi ;
 
 PRIVATE>
 

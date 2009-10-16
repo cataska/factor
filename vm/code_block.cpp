@@ -39,7 +39,7 @@ int factor_vm::number_of_parameters(relocation_type type)
 	case RT_DLSYM:
 		return 2;
 	case RT_THIS:
-	case RT_STACK_CHAIN:
+	case RT_CONTEXT:
 	case RT_MEGAMORPHIC_CACHE_HITS:
 	case RT_CARDS_OFFSET:
 	case RT_DECKS_OFFSET:
@@ -97,7 +97,7 @@ void factor_vm::undefined_symbol()
 
 void undefined_symbol()
 {
-	return SIGNAL_VM_PTR()->undefined_symbol();
+	return tls_vm()->undefined_symbol();
 }
 
 /* Look up an external library symbol referenced by a compiled code block */
@@ -174,8 +174,8 @@ cell factor_vm::compute_relocation(relocation_entry rel, cell index, code_block 
 	}
 	case RT_THIS:
 		return (cell)(compiled + 1);
-	case RT_STACK_CHAIN:
-		return (cell)&stack_chain;
+	case RT_CONTEXT:
+		return (cell)&ctx;
 	case RT_UNTAGGED:
 		return untag_fixnum(ARG);
 	case RT_MEGAMORPHIC_CACHE_HITS:
@@ -315,8 +315,8 @@ void factor_vm::relocate_code_block_step(relocation_entry rel, cell index, code_
 #endif
 
 	store_address_in_code_block(relocation_class_of(rel),
-				    relocation_offset_of(rel) + (cell)compiled->xt(),
-				    compute_relocation(rel,index,compiled));
+		relocation_offset_of(rel) + (cell)compiled->xt(),
+		compute_relocation(rel,index,compiled));
 }
 
 struct word_references_updater {
@@ -351,6 +351,41 @@ void factor_vm::update_word_references(code_block *compiled)
 	else
 	{
 		word_references_updater updater(this);
+		iterate_relocations(compiled,updater);
+		flush_icache_for(compiled);
+	}
+}
+
+/* This runs after a full collection */
+struct literal_and_word_references_updater {
+	factor_vm *myvm;
+
+	explicit literal_and_word_references_updater(factor_vm *myvm_) : myvm(myvm_) {}
+
+	void operator()(relocation_entry rel, cell index, code_block *compiled)
+	{
+		relocation_type type = myvm->relocation_type_of(rel);
+		switch(type)
+		{
+		case RT_IMMEDIATE:
+		case RT_XT:
+		case RT_XT_PIC:
+		case RT_XT_PIC_TAIL:
+			myvm->relocate_code_block_step(rel,index,compiled);
+			break;
+		default:
+			break;
+		}
+	}
+};
+
+void factor_vm::update_code_block_for_full_gc(code_block *compiled)
+{
+	if(code->needs_fixup_p(compiled))
+		relocate_code_block(compiled);
+	else
+	{
+		literal_and_word_references_updater updater(this);
 		iterate_relocations(compiled,updater);
 		flush_icache_for(compiled);
 	}
@@ -406,10 +441,14 @@ code_block *factor_vm::allot_code_block(cell size, cell type)
 {
 	heap_block *block = code->heap_allot(size + sizeof(code_block),type);
 
-	/* If allocation failed, do a code GC */
+	/* If allocation failed, do a full GC and compact the code heap.
+	A full GC that occurs as a result of the data heap filling up does not
+	trigger a compaction. This setup ensures that most GCs do not compact
+	the code heap, but if the code fills up, it probably means it will be
+	fragmented after GC anyway, so its best to compact. */
 	if(block == NULL)
 	{
-		gc();
+		primitive_compact_gc();
 		block = code->heap_allot(size + sizeof(code_block),type);
 
 		/* Insufficient room even after code GC, give up */

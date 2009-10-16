@@ -21,6 +21,20 @@ M: x86.64 ds-reg R14 ;
 M: x86.64 rs-reg R15 ;
 M: x86.64 stack-reg RSP ;
 
+: load-cards-offset ( dst -- )
+    0 MOV rc-absolute-cell rel-cards-offset ;
+
+M: x86.64 %mark-card
+    dup load-cards-offset
+    [+] card-mark <byte> MOV ;
+
+: load-decks-offset ( dst -- )
+    0 MOV rc-absolute-cell rel-decks-offset ;
+
+M: x86.64 %mark-deck
+    dup load-decks-offset
+    [+] card-mark <byte> MOV ;
+
 M:: x86.64 %dispatch ( src temp -- )
     building get length :> start
     ! Load jump table base.
@@ -180,7 +194,9 @@ M: x86.64 %alien-invoke
     R11 CALL ;
 
 M: x86.64 %nest-stacks ( -- )
-    param-reg-1 %mov-vm-ptr
+    ! Save current frame. See comment in vm/contexts.hpp
+    param-reg-1 stack-reg stack-frame get total-size>> 3 cells - [+] LEA
+    param-reg-2 %mov-vm-ptr
     "nest_stacks" f %alien-invoke ;
 
 M: x86.64 %unnest-stacks ( -- )

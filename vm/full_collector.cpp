@@ -26,18 +26,8 @@ struct stack_frame_marker {
 /* Mark code blocks executing in currently active stack frames. */
 void full_collector::mark_active_blocks()
 {
-	context *stacks = this->myvm->stack_chain;
-
-	while(stacks)
-	{
-		cell top = (cell)stacks->callstack_top;
-		cell bottom = (cell)stacks->callstack_bottom;
-
-		stack_frame_marker marker(this);
-		myvm->iterate_callstack(top,bottom,marker);
-
-		stacks = stacks->next;
-	}
+	stack_frame_marker marker(this);
+	myvm->iterate_active_frames(marker);
 }
 
 void full_collector::mark_object_code_block(object *obj)
@@ -70,6 +60,23 @@ void full_collector::mark_object_code_block(object *obj)
 	}
 }
 
+struct callback_tracer {
+	full_collector *collector;
+
+	callback_tracer(full_collector *collector_) : collector(collector_) {}
+	
+	void operator()(callback *stub)
+	{
+		collector->mark_code_block(stub->compiled);
+	}
+};
+
+void full_collector::trace_callbacks()
+{
+	callback_tracer tracer(this);
+	myvm->callbacks->iterate(tracer);
+}
+
 /* Trace all literals referenced from a code block. Only for aging and nursery collections */
 void full_collector::trace_literal_references(code_block *compiled)
 {
@@ -97,10 +104,12 @@ void full_collector::cheneys_algorithm()
 	}
 }
 
-struct full_updater {
+/* After growing the heap, we have to perform a full relocation to update
+references to card and deck arrays. */
+struct big_code_heap_updater {
 	factor_vm *myvm;
 
-	full_updater(factor_vm *myvm_) : myvm(myvm_) {}
+	big_code_heap_updater(factor_vm *myvm_) : myvm(myvm_) {}
 
 	void operator()(heap_block *block)
 	{
@@ -108,35 +117,18 @@ struct full_updater {
 	}
 };
 
-struct literal_and_word_reference_updater {
+/* After a full GC that did not grow the heap, we have to update references
+to literals and other words. */
+struct small_code_heap_updater {
 	factor_vm *myvm;
 
-	literal_and_word_reference_updater(factor_vm *myvm_) : myvm(myvm_) {}
+	small_code_heap_updater(factor_vm *myvm_) : myvm(myvm_) {}
 
 	void operator()(heap_block *block)
 	{
-		code_block *compiled = (code_block *)block;
-		myvm->update_literal_references(compiled);
-		myvm->update_word_references(compiled);
+		myvm->update_code_block_for_full_gc((code_block *)block);
 	}
 };
-
-void factor_vm::free_unmarked_code_blocks(bool growing_data_heap)
-{
-	if(growing_data_heap)
-	{
-		full_updater updater(this);
-		code->free_unmarked(updater);
-	}
-	else
-	{
-		literal_and_word_reference_updater updater(this);
-		code->free_unmarked(updater);
-	}
-
-	code->points_to_nursery.clear();
-	code->points_to_aging.clear();
-}
 
 void factor_vm::collect_full_impl(bool trace_contexts_p)
 {
@@ -147,6 +139,7 @@ void factor_vm::collect_full_impl(bool trace_contexts_p)
 	{
 		collector.trace_contexts();
 		collector.mark_active_blocks();
+		collector.trace_callbacks();
 	}
 
 	collector.cheneys_algorithm();
@@ -155,21 +148,52 @@ void factor_vm::collect_full_impl(bool trace_contexts_p)
 	nursery.here = nursery.start;
 }
 
-void factor_vm::collect_growing_heap(cell requested_bytes, bool trace_contexts_p)
+/* In both cases, compact code heap before updating code blocks so that
+XTs are correct after */
+
+void factor_vm::big_code_heap_update()
 {
+	big_code_heap_updater updater(this);
+	code->free_unmarked(updater);
+	code->clear_remembered_set();
+}
+
+void factor_vm::collect_growing_heap(cell requested_bytes,
+	bool trace_contexts_p,
+	bool compact_code_heap_p)
+{
+	/* Grow the data heap and copy all live objects to the new heap. */
 	data_heap *old = data;
 	set_data_heap(data->grow(requested_bytes));
 	collect_full_impl(trace_contexts_p);
-	free_unmarked_code_blocks(true);
 	delete old;
+
+	if(compact_code_heap_p) compact_code_heap(trace_contexts_p);
+
+	big_code_heap_update();
 }
 
-void factor_vm::collect_full(bool trace_contexts_p)
+void factor_vm::small_code_heap_update()
 {
+	small_code_heap_updater updater(this);
+	code->free_unmarked(updater);
+	code->clear_remembered_set();
+}
+
+void factor_vm::collect_full(bool trace_contexts_p, bool compact_code_heap_p)
+{
+	/* Copy all live objects to the tenured semispace. */
 	std::swap(data->tenured,data->tenured_semispace);
 	reset_generation(data->tenured);
 	collect_full_impl(trace_contexts_p);
-	free_unmarked_code_blocks(false);
+
+	if(compact_code_heap_p)
+	{
+		compact_code_heap(trace_contexts_p);
+		big_code_heap_update();
+	}
+	else
+		small_code_heap_update();
 }
 
 }
