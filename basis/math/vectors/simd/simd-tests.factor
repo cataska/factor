@@ -193,21 +193,17 @@ CONSTANT: simd-classes
         '[ first2 inputs _ _ check-vector-op ]
     ] dip check-optimizer ; inline
 
-: approx= ( x y -- ? )
+: (approx=) ( x y -- ? )
     {
         { [ 2dup [ fp-nan? ] both? ] [ 2drop t ] }
-        { [ 2dup [ float? ] both? ] [ -1.e8 ~ ] }
+        { [ 2dup [ fp-nan? ] either? ] [ 2drop f ] }
         { [ 2dup [ fp-infinity? ] either? ] [ fp-bitwise= ] }
-        { [ 2dup [ sequence? ] both? ] [
-            [
-                {
-                    { [ 2dup [ fp-nan? ] both? ] [ 2drop t ] }
-                    { [ 2dup [ fp-infinity? ] either? ] [ fp-bitwise= ] }
-                    { [ 2dup [ fp-nan? ] either? not ] [ -1.e8 ~ ] }
-                } cond
-            ] 2all?
-        ] }
+        { [ 2dup [ float? ] both? ] [ -1.e8 ~ ] }
     } cond ;
+
+: approx= ( x y -- ? )
+    2dup [ sequence? ] both?
+    [ [ (approx=) ] 2all? ] [ (approx=) ] if ;
 
 : exact= ( x y -- ? )
     {
@@ -289,23 +285,23 @@ simd-classes&reps [
 
 "== Checking shifts and permutations" print
 
-[ int-4{ 256 512 1024 2048 } ]
-[ int-4{ 1 2 4 8 } 1 hlshift ] unit-test
+[ char-16{ 0 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 } ]
+[ char-16{ 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 } 1 hlshift ] unit-test
 
-[ int-4{ 256 512 1024 2048 } ]
-[ int-4{ 1 2 4 8 } [ { int-4 } declare 1 hlshift ] compile-call ] unit-test
+[ char-16{ 0 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 } ]
+[ char-16{ 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 } [ { char-16 } declare 1 hlshift ] compile-call ] unit-test
 
-[ int-4{ 256 512 1024 2048 } ]
-[ int-4{ 1 2 4 8 } 1 [ { int-4 fixnum } declare hlshift ] compile-call ] unit-test
+[ char-16{ 0 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 } ]
+[ char-16{ 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 } 1 [ { char-16 fixnum } declare hlshift ] compile-call ] unit-test
 
-[ int-4{ 1 2 4 8 } ]
-[ int-4{ 256 512 1024 2048 } 1 hrshift ] unit-test
+[ char-16{ 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 0 } ]
+[ char-16{ 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 } 1 hrshift ] unit-test
 
-[ int-4{ 1 2 4 8 } ]
-[ int-4{ 256 512 1024 2048 } [ { int-4 } declare 1 hrshift ] compile-call ] unit-test
+[ char-16{ 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 0 } ]
+[ char-16{ 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 } [ { char-16 } declare 1 hrshift ] compile-call ] unit-test
 
-[ int-4{ 1 2 4 8 } ]
-[ int-4{ 256 512 1024 2048 } 1 [ { int-4 fixnum } declare hrshift ] compile-call ] unit-test
+[ char-16{ 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 0 } ]
+[ char-16{ 1 2 4 8 1 2 4 8 1 2 4 8 1 2 4 8 } 1 [ { char-16 fixnum } declare hrshift ] compile-call ] unit-test
 
 ! Invalid inputs should not cause the compiler to throw errors
 [ ] [
