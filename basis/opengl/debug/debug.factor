@@ -1,6 +1,6 @@
 ! (c)2009 Joe Groff bsd license
 USING: accessors kernel namespaces parser tools.continuations
-ui.backend ui.gadgets.worlds words ;
+ui.backend ui.gadgets.worlds words sequences ;
 IN: opengl.debug
 
 SYMBOL: G-world
@@ -19,5 +19,5 @@ SYMBOL: G-world
 << \ gl-break t "break?" set-word-prop >>
 
 SYNTAX: GB
-    \ gl-break parsed ;
+    \ gl-break suffix! ;
 
