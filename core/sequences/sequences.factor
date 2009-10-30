@@ -268,24 +268,23 @@ INSTANCE: repetition immutable-sequence
 ERROR: integer-length-expected obj ;
 
 : check-length ( n -- n )
-    #! Ricing.
     dup integer? [ integer-length-expected ] unless ; inline
 
-: ((copy)) ( dst i src j n -- dst i src j n )
-    dup -roll [
-        + swap nth-unsafe -roll [
-            + swap set-nth-unsafe
-        ] 3keep drop
-    ] 3keep ; inline
+: ((copy)) ( dst i src j n -- )
+    [ + swap nth-unsafe [ ] curry 2dip ] keep
+    + swap set-nth-unsafe ; inline
+
+: 5bi ( a b c d e x y -- )
+    bi-curry bi-curry bi-curry bi-curry bi ; inline
 
 : (copy) ( dst i src j n -- dst )
-    dup 0 <= [ 2drop 2drop ] [ 1 - ((copy)) (copy) ] if ;
+    dup 0 <= [ 2drop 2drop ] [ 1 - [ ((copy)) ] [ (copy) ] 5bi ] if ;
     inline recursive
 
 : prepare-subseq ( from to seq -- dst i src j n )
-    #! The check-length call forces partial dispatch
-    [ [ swap - ] dip new-sequence dup 0 ] 3keep
-    -rot drop roll length check-length ; inline
+    [ over - ] dip
+    [ new-sequence 0 rot ] 2keep
+    [ ] curry 2dip check-length ; inline
 
 : check-copy ( src n dst -- )
     over 0 < [ bounds-error ] when
