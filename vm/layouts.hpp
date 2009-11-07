@@ -246,7 +246,7 @@ struct code_block
 
 	cell size() const
 	{
-		return header >> 3;
+		return header & ~7;
 	}
 
 	void *xt() const
@@ -371,6 +371,14 @@ struct tuple : public object {
 	cell layout;
 
 	cell *data() const { return (cell *)(this + 1); }
+};
+
+struct data_root_range {
+	cell *start;
+	cell len;
+
+	explicit data_root_range(cell *start_, cell len_) :
+		start(start_), len(len_) {}
 };
 
 }
