@@ -712,3 +712,7 @@ M: bad-executable summary
 \ disable-gc-events { } { object } define-primitive
 
 \ profiling { object } { } define-primitive
+
+\ (identity-hashcode) { object } { fixnum } define-primitive
+
+\ compute-identity-hashcode { object } { } define-primitive
