@@ -35,7 +35,7 @@ SYMBOL: bootstrap-time
 : count-words ( pred -- )
     all-words swap count number>string write ; inline
 
-: print-time ( ms -- )
+: print-time ( us -- )
     1000 /i
     60 /mod swap
     number>string write
@@ -59,7 +59,7 @@ SYMBOL: bootstrap-time
 
 [
     ! We time bootstrap
-    millis
+    system-micros 1000 /i
 
     default-image-name "output-image" set-global
 
@@ -84,14 +84,14 @@ SYMBOL: bootstrap-time
 
     load-components
 
-    millis over - core-bootstrap-time set-global
+    system-micros 1000 /i over - core-bootstrap-time set-global
 
     run-bootstrap-init
 
     f error set-global
     f error-continuation set-global
 
-    millis swap - bootstrap-time set-global
+    system-micros 1000 /i swap - bootstrap-time set-global
     print-report
 
     "deploy-vocab" get [
