@@ -2,7 +2,7 @@
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors alien alien.c-types alien.syntax kernel math
 namespaces sequences destructors combinators threads heaps
-deques calendar core-foundation core-foundation.strings
+deques calendar system core-foundation core-foundation.strings
 core-foundation.file-descriptors core-foundation.timers
 core-foundation.time ;
 IN: core-foundation.run-loop
@@ -96,12 +96,15 @@ TUPLE: run-loop fds sources timers ;
 : ((reset-timer)) ( timer counter timestamp -- )
     nip >CFAbsoluteTime CFRunLoopTimerSetNextFireDate ;
 
+: nano-count>timestamp ( x -- timestamp )
+    nano-count - nanoseconds now time+ ;
+
 : (reset-timer) ( timer counter -- )
     yield {
         { [ dup 0 = ] [ now ((reset-timer)) ] }
         { [ run-queue deque-empty? not ] [ 1 - (reset-timer) ] }
         { [ sleep-queue heap-empty? ] [ 5 minutes hence ((reset-timer)) ] }
-        [ sleep-queue heap-peek nip micros>timestamp ((reset-timer)) ]
+        [ sleep-queue heap-peek nip nano-count>timestamp ((reset-timer)) ]
     } cond ;
 
 : reset-timer ( timer -- )

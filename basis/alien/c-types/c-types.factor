@@ -297,20 +297,17 @@ M: long-long-type box-parameter ( n c-type -- )
 M: long-long-type box-return ( c-type -- )
     f swap box-parameter ;
 
-: define-deref ( name -- )
-    [ CHAR: * prefix "alien.c-types" create ] [ c-getter 0 prefix ] bi
+: define-deref ( c-type -- )
+    [ name>> CHAR: * prefix "alien.c-types" create ] [ c-getter 0 prefix ] bi
     (( c-ptr -- value )) define-inline ;
 
-: define-out ( name -- )
-    [ "alien.c-types" constructor-word ]
+: define-out ( c-type -- )
+    [ name>> "alien.c-types" constructor-word ]
     [ dup c-setter '[ _ heap-size (byte-array) [ 0 @ ] keep ] ] bi
     (( value -- c-ptr )) define-inline ;
 
 : define-primitive-type ( c-type name -- )
-    [ typedef ]
-    [ name>> define-deref ]
-    [ name>> define-out ]
-    tri ;
+    [ typedef ] [ define-deref ] [ define-out ] tri ;
 
 : if-void ( c-type true false -- )
     pick void? [ drop nip call ] [ nip call ] if ; inline
