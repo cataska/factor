@@ -86,6 +86,15 @@ cell factor_vm::frame_executing(stack_frame *frame)
 	return frame_code(frame)->owner;
 }
 
+cell factor_vm::frame_executing_quot(stack_frame *frame)
+{
+	tagged<object> executing(frame_executing(frame));
+	code_block *compiled = frame_code(frame);
+	if(!compiled->optimized_p() && executing->type() == WORD_TYPE)
+		executing = executing.as<word>()->def;
+	return executing.value();
+}
+
 stack_frame *factor_vm::frame_successor(stack_frame *frame)
 {
 	check_frame(frame);
@@ -99,14 +108,17 @@ cell factor_vm::frame_scan(stack_frame *frame)
 	{
 	case code_block_unoptimized:
 		{
-			cell quot = frame_executing(frame);
-			if(to_boolean(quot))
+			tagged<object> obj(frame_executing(frame));
+			if(obj.type_p(WORD_TYPE))
+				obj = obj.as<word>()->def;
+
+			if(obj.type_p(QUOTATION_TYPE))
 			{
 				char *return_addr = (char *)FRAME_RETURN_ADDRESS(frame,this);
 				char *quot_xt = (char *)(frame_code(frame) + 1);
 
 				return tag_fixnum(quot_code_offset_to_scan(
-					quot,(cell)(return_addr - quot_xt)));
+					obj.value(),(cell)(return_addr - quot_xt)));
 			}    
 			else
 				return false_object;
@@ -130,7 +142,7 @@ struct stack_frame_accumulator {
 
 	void operator()(stack_frame *frame)
 	{
-		data_root<object> executing(parent->frame_executing(frame),parent);
+		data_root<object> executing(parent->frame_executing_quot(frame),parent);
 		data_root<object> scan(parent->frame_scan(frame),parent);
 
 		frames.add(executing.value());
@@ -163,23 +175,18 @@ stack_frame *factor_vm::innermost_stack_frame(callstack *stack)
 	return frame;
 }
 
-stack_frame *factor_vm::innermost_stack_frame_quot(callstack *callstack)
-{
-	stack_frame *inner = innermost_stack_frame(callstack);
-	tagged<quotation>(frame_executing(inner)).untag_check(this);
-	return inner;
-}
-
 /* Some primitives implementing a limited form of callstack mutation.
 Used by the single stepper. */
 void factor_vm::primitive_innermost_stack_frame_executing()
 {
-	dpush(frame_executing(innermost_stack_frame(untag_check<callstack>(dpop()))));
+	stack_frame *frame = innermost_stack_frame(untag_check<callstack>(dpop()));
+	dpush(frame_executing_quot(frame));
 }
 
 void factor_vm::primitive_innermost_stack_frame_scan()
 {
-	dpush(frame_scan(innermost_stack_frame_quot(untag_check<callstack>(dpop()))));
+	stack_frame *frame = innermost_stack_frame(untag_check<callstack>(dpop()));
+	dpush(frame_scan(frame));
 }
 
 void factor_vm::primitive_set_innermost_stack_frame_quot()
@@ -190,9 +197,9 @@ void factor_vm::primitive_set_innermost_stack_frame_quot()
 	callstack.untag_check(this);
 	quot.untag_check(this);
 
-	jit_compile(quot.value(),true);
+	jit_compile_quot(quot.value(),true);
 
-	stack_frame *inner = innermost_stack_frame_quot(callstack.untagged());
+	stack_frame *inner = innermost_stack_frame(callstack.untagged());
 	cell offset = (char *)FRAME_RETURN_ADDRESS(inner,this) - (char *)inner->xt;
 	inner->xt = quot->xt;
 	FRAME_RETURN_ADDRESS(inner,this) = (char *)quot->xt + offset;
