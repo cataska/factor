@@ -8,7 +8,7 @@ IN: diamond
 SYMBOL: mid
 SYMBOL: height
 
-: >mid ( max -- ) 2 /mod drop 1+ mid set ;
+: >mid ( max -- ) 2 /mod drop 1 + mid set ;
 
 : mid> ( -- mid ) mid get ;
 
@@ -23,10 +23,10 @@ SYMBOL: height
     [a,b] >array [ pprint ] each "\n" write ;
 
 : spaces ( row -- )
-    mid> swap - 1- abs print-spaces ;
+    mid> swap - 1 - abs print-spaces ;
 
 : numbers ( row -- start end )
-    height> mid> [ + ] keep rot - 1- abs 2 * - 1- mid> swap ;
+    height> mid> [ + ] keep rot - 1 - abs 2 * - 1 - mid> swap ;
 
 : row ( row -- )
     numbers print-row ;
@@ -34,7 +34,7 @@ SYMBOL: height
 : result ( row -- ) [ spaces ] [ row ] bi ;
 
 : (diamond) ( -- )
-     0 height> 1- [a,b] >array [ result ] each ;
+     0 height> 1 - [a,b] >array [ result ] each ;
 
 : diamond ( height -- )
     [ >mid ] [ >height ] bi (diamond) ;

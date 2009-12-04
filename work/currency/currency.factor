@@ -1,7 +1,7 @@
 ! Copyright (C) 2009 Wen-Chun Lin.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: formatting http.client sequences strings kernel io math regexp
-unicode.case assocs ;
+unicode.case assocs shuffle ;
 
 IN: currency
 
