@@ -43,9 +43,8 @@ u64 nano_count()
 {
 	LARGE_INTEGER count;
 	LARGE_INTEGER frequency;
-	static u32 hi_correction = 0;
-	static u32 hi = 0xffffffff;
-	static u32 lo = 0xffffffff;
+	static u32 hi = 0;
+	static u32 lo = 0;
 	BOOL ret;
 	ret = QueryPerformanceCounter(&count);
 	if(ret == 0)
@@ -54,14 +53,11 @@ u64 nano_count()
 	if(ret == 0)
 		fatal_error("QueryPerformanceFrequency", 0);
 
-	if((u32)count.LowPart < lo && (u32)count.HighPart == hi)
-		hi_correction++;
-
-	hi = count.HighPart;
+	if(count.LowPart < lo)
+		hi += 1;
 	lo = count.LowPart;
-	count.HighPart += hi_correction;
 
-	return count.QuadPart*(1000000000/frequency.QuadPart);
+	return (((u64)hi << 32) | (u64)lo)*(1000000000/frequency.QuadPart);
 }
 
 void sleep_nanos(u64 nsec)
@@ -107,6 +103,11 @@ LONG factor_vm::exception_handler(PEXCEPTION_POINTERS pe)
 		exception code being raised. The workaround seems to be ignoring
 		this altogether, since that is what happens if SEH is not
 		enabled. Don't really have any idea what this exception means. */
+		break;
+	case 0xe06d7363:
+		/* This exception comes from a Visual Studio C++ app that uses
+		throw. Ignore it.
+		http://support.microsoft.com/kb/185294 */
 		break;
 	default:
 		signal_number = e->ExceptionCode;
