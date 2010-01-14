@@ -225,7 +225,7 @@ unit-test
         random-integer
         random-integer
         [ >float / ] [ /f ] 2bi 0.1 ~
-    ] all?
+    ] all-integers?
 ] unit-test
 
 ! Ensure that /f is accurate for fixnums > 2^53 on 64-bit platforms

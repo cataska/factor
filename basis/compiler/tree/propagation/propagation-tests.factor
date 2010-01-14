@@ -90,6 +90,8 @@ IN: compiler.tree.propagation.tests
 
 [ float ] [ [ { float float } declare mod ] final-math-class ] unit-test
 
+[ V{ integer float } ] [ [ { float float } declare [ /i ] keep ] final-classes ] unit-test
+
 [ V{ fixnum } ] [ [ 255 bitand ] final-classes ] unit-test
 
 [ V{ fixnum } ] [
@@ -404,14 +406,6 @@ IN: compiler.tree.propagation.tests
     ] final-literals
 ] unit-test
 
-[ V{ 27 } ] [
-    [
-        dup number? over sequence? and [
-            dup 10 < over 8 <= not and [ 3 * ] [ "A" throw ] if
-        ] [ "B" throw ] if
-    ] final-literals
-] unit-test
-
 [ V{ string string } ] [
     [
         2dup [ dup string? [ "Oops" throw ] unless ] bi@ 2drop
@@ -679,7 +673,7 @@ M: array iterate first t ; inline
 ] unit-test
 
 [ V{ fixnum } ] [
-    [ { fixnum fixnum } declare [ nth-unsafe ] curry call ] final-classes
+    [ { fixnum fixnum } declare iota [ nth-unsafe ] curry call ] final-classes
 ] unit-test
 
 [ V{ f } ] [
