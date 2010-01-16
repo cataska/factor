@@ -50,7 +50,8 @@ TUPLE: world-attributes
     status
     gadgets
     { pixel-format-attributes initial: $ default-world-pixel-format-attributes }
-    { window-controls initial: $ default-world-window-controls } ;
+    { window-controls initial: $ default-world-window-controls }
+    pref-dim ;
 
 : <world-attributes> ( -- world-attributes )
     world-attributes new ; inline
@@ -132,7 +133,8 @@ M: world request-focus-on ( child gadget -- )
         [ window-controls>> >>window-controls ]
         [ initial-background-color >>background-color ]
         [ grab-input?>> >>grab-input? ]
-        [ gadgets>> [ 1 track-add ] each ]
+        [ gadgets>> dup sequence? [ [ 1 track-add ] each ] [ 1 track-add ] if ]
+        [ pref-dim>> >>pref-dim ]
     } cleave ;
 
 : <world> ( world-attributes -- world )
