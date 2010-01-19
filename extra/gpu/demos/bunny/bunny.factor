@@ -1,6 +1,6 @@
 ! (c)2009 Joe Groff bsd license
 USING: accessors alien.c-types arrays classes.struct combinators
-combinators.short-circuit game.worlds gpu gpu.buffers
+combinators.short-circuit game.loop game.worlds gpu gpu.buffers
 gpu.util.wasd gpu.framebuffers gpu.render gpu.shaders gpu.state
 gpu.textures gpu.util grouping http.client images images.loader
 io io.encodings.ascii io.files io.files.temp kernel locals math
@@ -307,5 +307,5 @@ GAME: bunny-game {
         } }
         { grab-input? t }
         { pref-dim { 1024 768 } }
-        { tick-interval-micros $[ 1,000,000 60 /i ] }
+        { tick-interval-micros $[ 60 fps ] }
     } ;

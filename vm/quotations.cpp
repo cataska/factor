@@ -43,7 +43,7 @@ void quotation_jit::init_quotation(cell quot)
 
 bool quotation_jit::primitive_call_p(cell i, cell length)
 {
-	return (i + 2) == length && array_nth(elements.untagged(),i + 1) == parent->special_objects[JIT_PRIMITIVE_WORD];
+	return (i + 2) <= length && array_nth(elements.untagged(),i + 1) == parent->special_objects[JIT_PRIMITIVE_WORD];
 }
 
 bool quotation_jit::fast_if_p(cell i, cell length)
@@ -178,7 +178,7 @@ void quotation_jit::iterate_quotation()
 		case WRAPPER_TYPE:
 			push(obj.as<wrapper>()->object);
 			break;
-		case FIXNUM_TYPE:
+		case BYTE_ARRAY_TYPE:
 			/* Primitive calls */
 			if(primitive_call_p(i,length))
 			{
@@ -189,6 +189,7 @@ void quotation_jit::iterate_quotation()
 				parameter(tag_fixnum(0));
 #endif
 				parameter(obj.value());
+				parameter(false_object);
 				emit(parent->special_objects[JIT_PRIMITIVE]);
 
 				i++;
@@ -348,7 +349,12 @@ fixnum factor_vm::quot_code_offset_to_scan(cell quot_, cell offset)
 cell factor_vm::lazy_jit_compile(cell quot_)
 {
 	data_root<quotation> quot(quot_,this);
-	jit_compile_quot(quot.value(),true);
+
+	assert(!quot_compiled_p(quot.untagged()));
+
+	code_block *compiled = jit_compile_quot(quot.value(),quot.value(),true);
+	set_quot_entry_point(quot.untagged(),compiled);
+
 	return quot.value();
 }
 
