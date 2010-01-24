@@ -11,18 +11,22 @@ TUPLE: noise-generator ;
 M: noise-generator generator-audio-format
     drop 1 16 8000 ;
 M: noise-generator generate-audio
-    nip [ -1 shift [ -4096 4096 [a,b] random ] short-array{ } replicate-as ] keep ;
+    drop
+    4096 [ -4096 4096 [a,b] random ] short-array{ } replicate-as
+    8192 ;
+M: noise-generator dispose
+    drop ;
 
 :: audio-engine-test ( -- )
     "vocab:audio/engine/test/loop.aiff" read-audio :> loop-sound
     "vocab:audio/engine/test/once.wav" read-audio :> once-sound
     0 :> i!
-    <standard-audio-engine> :> engine
+    f 4 <audio-engine> :> engine
     engine start-audio*
 
     engine T{ audio-source f {  1.0 0.0 0.0 } 1.0 { 0.0 0.0 0.0 } f } loop-sound t
         play-static-audio-clip :> loop-clip
-    engine T{ audio-source f { -1.0 0.0 0.0 } 1.0 { 0.0 0.0 0.0 } f } noise-generator new 8192 2
+    engine T{ audio-source f { -1.0 0.0 0.0 } 1.0 { 0.0 0.0 0.0 } f } noise-generator new 2
         play-streaming-audio-clip :> noise-clip
 
     [
