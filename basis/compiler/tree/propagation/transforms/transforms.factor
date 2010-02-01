@@ -163,10 +163,12 @@ ERROR: bad-partial-eval quot word ;
 
 : inline-new ( class -- quot/f )
     dup tuple-class? [
-        dup inlined-dependency depends-on
-        [ all-slots [ initial>> literalize ] map ]
-        [ tuple-layout '[ _ <tuple-boa> ] ]
-        bi append >quotation
+        dup tuple-layout
+        [ depends-on-tuple-layout ]
+        [ drop all-slots [ initial>> literalize ] [ ] map-as ]
+        [ nip ]
+        2tri
+        '[ @ _ <tuple-boa> ]
     ] [ drop f ] if ;
 
 \ new [ inline-new ] 1 define-partial-eval
@@ -282,6 +284,15 @@ CONSTANT: lookup-table-at-max 256
 
 \ intersect [ intersect-quot ] 1 define-partial-eval
 
+: fixnum-bits ( -- n )
+    cell-bits tag-bits get - ;
+
+: bit-quot ( #call -- quot/f )
+    in-d>> second value-info interval>> 0 fixnum-bits [a,b] interval-subset?
+    [ [ >fixnum ] dip fixnum-bit? ] f ? ;
+
+\ bit? [ bit-quot ] "custom-inlining" set-word-prop
+
 ! Speeds up sum-file, sort and reverse-complement benchmarks by
 ! compiling decoder-readln better
 \ push [
@@ -293,6 +304,6 @@ CONSTANT: lookup-table-at-max 256
 ! calls when a C type is redefined
 \ heap-size [
     dup word? [
-        [ inlined-dependency depends-on ] [ heap-size '[ _ ] ] bi
+        [ depends-on-definition ] [ heap-size '[ _ ] ] bi
     ] [ drop f ] if
 ] 1 define-partial-eval

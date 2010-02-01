@@ -3,11 +3,12 @@
 USING: alien alien.strings arrays byte-arrays generic hashtables
 hashtables.private io io.encodings.ascii kernel math
 math.private math.order namespaces make parser sequences strings
-vectors words quotations assocs layouts classes classes.builtin
-classes.tuple classes.tuple.private kernel.private vocabs
-vocabs.loader source-files definitions slots classes.union
-classes.intersection classes.predicate compiler.units
-bootstrap.image.private io.files accessors combinators ;
+vectors words quotations assocs layouts classes classes.private
+classes.builtin classes.tuple classes.tuple.private
+kernel.private vocabs vocabs.loader source-files definitions
+slots classes.union classes.intersection classes.predicate
+compiler.units bootstrap.image.private io.files accessors
+combinators ;
 IN: bootstrap.primitives
 
 "Creating primitives and basic runtime structures..." print flush
@@ -125,6 +126,9 @@ call( -- )
 : define-builtin-slots ( class slots -- )
     prepare-slots make-slots 1 finalize-slots
     [ "slots" set-word-prop ] [ define-accessors ] 2bi ;
+
+: define-builtin-predicate ( class -- )
+    dup class>type [ eq? ] curry [ tag ] prepend define-predicate ;
 
 : define-builtin ( symbol slotspec -- )
     [ [ define-builtin-predicate ] keep ] dip define-builtin-slots ;

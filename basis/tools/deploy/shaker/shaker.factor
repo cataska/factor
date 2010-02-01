@@ -1,4 +1,4 @@
-! Copyright (C) 2007, 2009 Slava Pestov.
+! Copyright (C) 2007, 2010 Slava Pestov.
 ! See http://factorcode.org/license.txt for BSD license.
 USING: arrays accessors io.backend io.streams.c init fry
 namespaces math make assocs kernel parser parser.notes lexer
@@ -9,6 +9,7 @@ compiler.units definitions generic generic.standard
 generic.single tools.deploy.config combinators classes
 classes.builtin slots.private grouping command-line ;
 QUALIFIED: bootstrap.stage2
+QUALIFIED: classes.private
 QUALIFIED: compiler.crossref
 QUALIFIED: compiler.errors
 QUALIFIED: continuations
@@ -127,7 +128,10 @@ IN: tools.deploy.shaker
                 "coercer"
                 "combination"
                 "compiled-generic-uses"
-                "compiled-uses"
+                "effect-dependencies"
+                "definition-dependencies"
+                "conditional-dependencies"
+                "dependency-checks"
                 "constant"
                 "constraints"
                 "custom-inlining"
@@ -159,7 +163,6 @@ IN: tools.deploy.shaker
                 "members"
                 "memo-quot"
                 "methods"
-                "mixin"
                 "method-class"
                 "method-generic"
                 "modular-arithmetic"
@@ -330,14 +333,14 @@ IN: tools.deploy.shaker
             {
                 gensym
                 name>char-hook
-                next-method-quot-cache
-                class-and-cache
-                class-not-cache
-                class-or-cache
-                class<=-cache
-                classes-intersect-cache
-                implementors-map
-                update-map
+                classes.private:next-method-quot-cache
+                classes.private:class-and-cache
+                classes.private:class-not-cache
+                classes.private:class-or-cache
+                classes.private:class<=-cache
+                classes.private:classes-intersect-cache
+                classes.private:implementors-map
+                classes.private:update-map
                 main-vocab-hook
                 compiler.crossref:compiled-crossref
                 compiler.crossref:compiled-generic-crossref
