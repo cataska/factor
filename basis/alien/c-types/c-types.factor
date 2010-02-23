@@ -46,24 +46,17 @@ stack-align? ;
 
 ERROR: no-c-type name ;
 
-PREDICATE: c-type-word < word
-    "c-type" word-prop ;
-
-UNION: c-type-name string c-type-word ;
-
 ! C type protocol
 GENERIC: c-type ( name -- c-type ) foldable
 
-GENERIC: resolve-pointer-type ( name -- c-type )
+PREDICATE: c-type-word < word
+    "c-type" word-prop ;
 
-<< \ void \ void* "pointer-c-type" set-word-prop >>
+TUPLE: pointer { to initial: void read-only } ;
+C: <pointer> pointer
 
-M: word resolve-pointer-type
-    dup "pointer-c-type" word-prop
-    [ ] [ drop void* ] ?if ;
-
-M: array resolve-pointer-type
-    first resolve-pointer-type ;
+UNION: c-type-name
+    c-type-word pointer ;
 
 : resolve-typedef ( name -- c-type )
     dup void? [ no-c-type ] when
@@ -230,21 +223,13 @@ MIXIN: value-type
         \ swap , [ heap-size , [ * >fixnum ] % ] [ % ] bi*
     ] [ ] make ;
 
-GENERIC: typedef ( old new -- )
-
 PREDICATE: typedef-word < c-type-word
     "c-type" word-prop c-type-name? ;
 
-M: word typedef ( old new -- )
+: typedef ( old new -- )
     {
         [ nip define-symbol ]
         [ swap "c-type" set-word-prop ]
-        [
-            swap dup c-type-name? [
-                resolve-pointer-type
-                "pointer-c-type" set-word-prop
-            ] [ 2drop ] if
-        ]
     } 2cleave ;
 
 TUPLE: long-long-type < c-type ;
@@ -279,6 +264,10 @@ M: long-long-type box-return ( c-type -- )
 : if-void ( c-type true false -- )
     pick void? [ drop nip call ] [ nip call ] if ; inline
 
+SYMBOLS:
+    ptrdiff_t intptr_t uintptr_t size_t
+    c-string ;
+
 CONSTANT: primitive-types
     {
         char uchar
@@ -288,11 +277,30 @@ CONSTANT: primitive-types
         longlong ulonglong
         float double
         void* bool
+        c-string
     }
 
-SYMBOLS:
-    ptrdiff_t intptr_t uintptr_t size_t
-    char* uchar* ;
+: (pointer-c-type) ( void* type -- void*' )
+    [ clone ] dip c-type-boxer-quot '[ _ [ f ] if* ] >>boxer-quot ;
+
+<PRIVATE
+
+: resolve-pointer-typedef ( type -- base-type )
+    dup "c-type" word-prop dup word?
+    [ nip resolve-pointer-typedef ] [
+        pointer? [ drop void* ] when
+    ] if ;
+
+: primitive-pointer-type? ( type -- ? )
+    dup c-type-word? [
+        resolve-pointer-typedef [ void? ] [ primitive-types member? ] bi or
+    ] [ drop t ] if ;
+
+PRIVATE>
+
+M: pointer c-type
+    [ \ void* c-type ] dip
+    to>> dup primitive-pointer-type? [ drop ] [ (pointer-c-type) ] if ;
 
 : 8-byte-alignment ( c-type -- c-type )
     {
@@ -505,6 +513,7 @@ SYMBOLS:
         \ uint c-type \ uintptr_t typedef
         \ uint c-type \ size_t typedef
     ] if
+
 ] with-compilation-unit
 
 M: char-16-rep rep-component-type drop char ;

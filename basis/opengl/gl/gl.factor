@@ -22,7 +22,7 @@ TYPEDEF: float   GLfloat
 TYPEDEF: float   GLclampf
 TYPEDEF: double  GLdouble
 TYPEDEF: double  GLclampd
-TYPEDEF: void*   GLvoid*
+C-TYPE: GLvoid
 
 ! Constants
 
@@ -668,7 +668,7 @@ FUNCTION: void glPopClientAttrib ( ) ;
 
 FUNCTION: GLint glRenderMode ( GLenum mode ) ;
 FUNCTION: GLenum glGetError ( ) ;
-FUNCTION: char* glGetString ( GLenum name ) ;
+FUNCTION: c-string glGetString ( GLenum name ) ;
 FUNCTION: void glFinish ( ) ;
 FUNCTION: void glFlush ( ) ;
 FUNCTION: void glHint ( GLenum target, GLenum mode ) ;
