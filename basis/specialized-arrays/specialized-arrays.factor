@@ -95,7 +95,7 @@ M: A resize
     ] [ drop ] 2bi
     <direct-A> ; inline
 
-M: A byte-length length \ T heap-size * ; inline
+M: A element-size drop \ T heap-size ; inline
 
 M: A direct-array-syntax drop \ A@ ;
 
@@ -117,6 +117,7 @@ M: A v*high [ * \ T heap-size neg shift ] 2map ; inline
 ;FUNCTOR
 
 GENERIC: underlying-type ( c-type -- c-type' )
+
 M: c-type-word underlying-type
     dup "c-type" word-prop {
         { [ dup not ] [ drop no-c-type ] }
@@ -149,18 +150,21 @@ M: c-type-word c-array-constructor
     underlying-type
     dup [ name>> "<" "-array>" surround ] [ specialized-array-vocab ] bi lookup
     [ ] [ specialized-array-vocab-not-loaded ] ?if ; foldable
+
 M: pointer c-array-constructor drop void* c-array-constructor ;
 
 M: c-type-word c-(array)-constructor
     underlying-type
     dup [ name>> "(" "-array)" surround ] [ specialized-array-vocab ] bi lookup
     [ ] [ specialized-array-vocab-not-loaded ] ?if ; foldable
+
 M: pointer c-(array)-constructor drop void* c-(array)-constructor ;
 
 M: c-type-word c-direct-array-constructor
     underlying-type
     dup [ name>> "<direct-" "-array>" surround ] [ specialized-array-vocab ] bi lookup
     [ ] [ specialized-array-vocab-not-loaded ] ?if ; foldable
+
 M: pointer c-direct-array-constructor drop void* c-direct-array-constructor ;
 
 SYNTAX: SPECIALIZED-ARRAYS:
