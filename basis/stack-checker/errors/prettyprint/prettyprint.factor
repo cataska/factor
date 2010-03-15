@@ -10,14 +10,6 @@ M: unknown-macro-input summary
 M: bad-macro-input summary
     macro>> name>> "Cannot apply “" "” to a run-time computed value" surround ;
 
-M: unbalanced-branches-error summary
-    drop "Unbalanced branches" ;
-
-M: unbalanced-branches-error error.
-    dup summary print
-    [ quots>> ] [ branches>> [ length [ "x" <array> ] bi@ <effect> ] { } assoc>map ] bi zip
-    [ [ first pprint-short bl ] [ second effect>string print ] bi ] each ;
-
 M: too-many->r summary
     drop "Quotation pushes elements on retain stack without popping them" ;
 
@@ -61,3 +53,13 @@ M: transform-expansion-error error.
 
 M: do-not-compile summary
     word>> name>> "Cannot compile call to " prepend ;
+
+M: unbalanced-branches-error summary
+    word>> name>>
+    "The input quotations to " " don't match their expected effects" surround ;
+
+M: unbalanced-branches-error error.
+    dup summary print
+    [ quots>> ] [ declareds>> ] [ actuals>> ] tri 3array flip
+    { "Input" "Expected" "Got" } prefix simple-table. ;
+

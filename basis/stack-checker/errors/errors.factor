@@ -10,8 +10,6 @@ ERROR: bad-macro-input < inference-error macro ;
 
 ERROR: unknown-macro-input < inference-error macro ;
 
-ERROR: unbalanced-branches-error < inference-error branches quots ;
-
 ERROR: too-many->r < inference-error ;
 
 ERROR: too-many-r> < inference-error ;
@@ -33,3 +31,6 @@ ERROR: inconsistent-recursive-call-error < inference-error word ;
 ERROR: transform-expansion-error < inference-error error continuation word ;
 
 ERROR: bad-declaration-error < inference-error declaration ;
+
+ERROR: unbalanced-branches-error < inference-error word quots declareds actuals ;
+
