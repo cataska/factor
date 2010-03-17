@@ -6,6 +6,7 @@ io.backend.unix io.encodings.utf8 unix.linux.inotify assocs
 namespaces make threads continuations init math math.bitwise
 sets alien alien.strings alien.c-types vocabs.loader accessors
 system hashtables destructors unix classes.struct ;
+FROM: namespaces => set ;
 IN: io.monitors.linux
 
 SYMBOL: watches
@@ -81,7 +82,7 @@ M: linux-monitor dispose* ( monitor -- )
         IN_MOVED_FROM +rename-file-old+ ?flag
         IN_MOVED_TO +rename-file-new+ ?flag
         drop
-    ] { } make prune ;
+    ] { } make members ;
 
 : parse-event-name ( event -- name )
     dup len>> zero?
