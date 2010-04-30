@@ -1,4 +1,4 @@
-! Copyright (C) 2005, 2009 Eduardo Cavazos and Slava Pestov
+! Copyright (C) 2005, 2010 Eduardo Cavazos and Slava Pestov
 ! See http://factorcode.org/license.txt for BSD license.
 USING: accessors alien.c-types ascii assocs classes.struct combinators
 combinators.short-circuit command-line environment io.encodings.ascii
@@ -149,9 +149,9 @@ M: world button-up-event
         { 7 { 1 0 } }
     } at ;
 
-M: world wheel-event
+M: world scroll-event
     [ [ mouse-event>scroll-direction ] [ event-loc ] bi ] dip
-    send-wheel ;
+    send-scroll ;
 
 M: world enter-event motion-event ;
 
