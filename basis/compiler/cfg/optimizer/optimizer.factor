@@ -4,17 +4,13 @@ USING: compiler.cfg.tco
 compiler.cfg.useless-conditionals
 compiler.cfg.branch-splitting
 compiler.cfg.block-joining
+compiler.cfg.height
 compiler.cfg.ssa.construction
 compiler.cfg.alias-analysis
 compiler.cfg.value-numbering
 compiler.cfg.copy-prop
 compiler.cfg.dce
-compiler.cfg.write-barrier
-compiler.cfg.representations
-compiler.cfg.gc-checks
-compiler.cfg.save-contexts
-compiler.cfg.ssa.destruction
-compiler.cfg.checker ;
+compiler.cfg.write-barrier ;
 IN: compiler.cfg.optimizer
 
 : optimize-cfg ( cfg -- cfg' )
@@ -22,6 +18,7 @@ IN: compiler.cfg.optimizer
     delete-useless-conditionals
     split-branches
     join-blocks
+    normalize-height
     construct-ssa
     alias-analysis
     value-numbering
