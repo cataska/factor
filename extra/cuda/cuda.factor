@@ -19,7 +19,7 @@ TUPLE: launcher
         swap >>device ; inline
 
 TUPLE: function-launcher
-dim-block dim-grid shared-size stream ;
+dim-grid dim-block shared-size stream ;
 
 : with-cuda-context ( flags device quot -- )
     H{ } clone cuda-modules set-global
@@ -34,34 +34,36 @@ dim-block dim-grid shared-size stream ;
     '[ cuda-context set _ call ] with-cuda-context ; inline
 
 : with-cuda ( launcher quot -- )
-    init-cuda
-    [ H{ } clone cuda-memory-hashtable ] 2dip '[
-        _ 
+    init-cuda [
         [ cuda-launcher set ]
         [ [ device>> ] [ device-flags>> ] bi ] bi
-        _ with-cuda-program
-    ] with-variable ; inline
+    ] [ with-cuda-program ] bi* ; inline
 
 : c-type>cuda-setter ( c-type -- n cuda-type )
     {
         { [ dup a:int = ] [ drop 4 [ cuda-int* ] ] }
         { [ dup a:uint = ] [ drop 4 [ cuda-int* ] ] }
         { [ dup a:float = ] [ drop 4 [ cuda-float* ] ] }
-        { [ dup a:pointer? ] [ drop 4 [ ptr>> cuda-int* ] ] }
-        { [ dup a:void* = ] [ drop 4 [ ptr>> cuda-int* ] ] }
+        { [ dup a:pointer? ] [ drop 4 [ cuda-int* ] ] }
+        { [ dup a:void* = ] [ drop 4 [ cuda-int* ] ] }
     } cond ;
+
+<PRIVATE
+: block-dim ( block -- x y z )
+    dup sequence? [ 3 1 pad-tail first3 ] [ 1 1 ] if ; inline
+: grid-dim ( block -- x y )
+    dup sequence? [ 2 1 pad-tail first2 ] [ 1 ] if ; inline
+PRIVATE>
 
 : run-function-launcher ( function-launcher function -- )
     swap
     {
-        [ dim-block>> first3 function-block-shape* ]
+        [ dim-block>> block-dim function-block-shape* ]
         [ shared-size>> function-shared-size* ]
         [
-            dim-grid>> [
-                launch-function*
-            ] [
-                first2 launch-function-grid*
-            ] if-empty
+            dim-grid>>
+            [ grid-dim launch-function-grid* ]
+            [ launch-function* ] if*
         ]
     } 2cleave ;
 
