@@ -180,9 +180,11 @@ M: object copy-memory* copy-register* ;
 M: float-rep copy-memory* drop MOVSS ;
 M: double-rep copy-memory* drop MOVSD ;
 
+: ?spill-slot ( obj -- obj ) dup spill-slot? [ n>> spill@ ] when ;
+
 M: x86 %copy ( dst src rep -- )
     2over eq? [ 3drop ] [
-        [ [ dup spill-slot? [ n>> spill@ ] when ] bi@ ] dip
+        [ [ ?spill-slot ] bi@ ] dip
         2over [ register? ] both? [ copy-register* ] [ copy-memory* ] if
     ] if ;
 
@@ -501,16 +503,6 @@ M:: x86 %check-nursery-branch ( label size cc temp1 temp2 -- )
 
 M: x86 %alien-global ( dst symbol library -- )
     [ 0 MOV ] 2dip rc-absolute-cell rel-dlsym ;    
-
-M: x86 %push-stack ( -- )
-    ds-reg cell ADD
-    ds-reg [] int-regs return-reg MOV ;
-
-M: x86 %push-context-stack ( -- )
-    temp-reg %context
-    temp-reg "datastack" context-field-offset [+] bootstrap-cell ADD
-    temp-reg temp-reg "datastack" context-field-offset [+] MOV
-    temp-reg [] int-regs return-reg MOV ;
 
 M: x86 %epilogue ( n -- ) cell - incr-stack-reg ;
 
@@ -1451,10 +1443,28 @@ M: x86.64 %scalar>integer ( dst src rep -- )
     } case ;
 
 M: x86 %vector>scalar %copy ;
+
 M: x86 %scalar>vector %copy ;
 
-M:: x86 %spill ( src rep dst -- ) dst src rep %copy ;
-M:: x86 %reload ( dst rep src -- ) dst src rep %copy ;
+M:: x86 %spill ( src rep dst -- )
+    dst src rep %copy ;
+
+M:: x86 %reload ( dst rep src -- )
+    dst src rep %copy ;
+
+M:: x86 %store-reg-param ( src reg rep -- )
+    reg src rep %copy ;
+
+M:: x86 %store-stack-param ( src n rep -- )
+    n param@ src rep %copy ;
+
+HOOK: struct-return@ cpu ( n -- operand )
+
+M: x86 %prepare-struct-area ( dst -- )
+    f struct-return@ LEA ;
+
+M: x86 %alien-indirect ( src -- )
+    ?spill-slot CALL ;
 
 M: x86 %loop-entry 16 alignment [ NOP ] times ;
 

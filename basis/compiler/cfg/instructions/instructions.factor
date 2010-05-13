@@ -34,6 +34,10 @@ INSN: ##load-tagged
 def: dst/tagged-rep
 literal: val ;
 
+INSN: ##load-float
+def: dst/float-rep
+literal: val ;
+
 INSN: ##load-double
 def: dst/double-rep
 literal: val ;
@@ -605,17 +609,73 @@ use: src/tagged-rep
 literal: offset ;
 
 ! FFI
+INSN: ##stack-frame
+literal: stack-frame ;
+
+INSN: ##unbox
+def: dst
+use: src/tagged-rep
+literal: unboxer rep ;
+
+INSN: ##store-reg-param
+use: src
+literal: reg rep ;
+
+INSN: ##store-stack-param
+use: src
+literal: n rep ;
+
+INSN: ##store-return
+use: src
+literal: rep ;
+
+INSN: ##store-struct-return
+use: src/int-rep
+literal: c-type ;
+
+INSN: ##store-long-long-return
+use: src1/int-rep src2/int-rep ;
+
+INSN: ##prepare-struct-area
+def: dst/int-rep ;
+
+INSN: ##box
+def: dst/tagged-rep
+literal: n rep boxer ;
+
+INSN: ##box-long-long
+def: dst/tagged-rep
+literal: n boxer ;
+
+INSN: ##box-small-struct
+def: dst/tagged-rep
+literal: c-type ;
+
+INSN: ##box-large-struct
+def: dst/tagged-rep
+literal: n c-type ;
+
 INSN: ##alien-invoke
-literal: params stack-frame ;
+literal: symbols dll ;
+
+INSN: ##cleanup
+literal: n ;
 
 INSN: ##alien-indirect
-literal: params stack-frame ;
+use: src/int-rep ;
 
 INSN: ##alien-assembly
-literal: params stack-frame ;
+literal: quot ;
+
+INSN: ##save-param-reg
+literal: offset reg rep ;
+
+INSN: ##begin-callback ;
 
 INSN: ##alien-callback
-literal: params stack-frame ;
+literal: quot ;
+
+INSN: ##end-callback ;
 
 ! Control flow
 INSN: ##phi
@@ -706,6 +766,9 @@ literal: cc ;
 INSN: ##save-context
 temp: temp1/int-rep temp2/int-rep ;
 
+INSN: ##restore-context
+temp: temp1/int-rep temp2/int-rep ;
+
 ! GC checks
 INSN: ##check-nursery-branch
 literal: size cc
@@ -752,16 +815,22 @@ UNION: ##write ##set-slot ##set-slot-imm ##set-vm-field ;
 UNION: clobber-insn
 ##call-gc
 ##unary-float-function
-##binary-float-function ;
-
-! Instructions that kill all live vregs
-UNION: kill-vreg-insn
-##call
-##prologue
-##epilogue
+##binary-float-function
+##box
+##box-long-long
+##box-small-struct
+##box-large-struct
+##unbox
+##store-reg-param
+##store-return
+##store-struct-return
+##store-long-long-return
 ##alien-invoke
 ##alien-indirect
-##alien-callback ;
+##alien-assembly
+##save-param-reg
+##begin-callback
+##end-callback ;
 
 ! Instructions that have complex expansions and require that the
 ! output registers are not equal to any of the input registers
