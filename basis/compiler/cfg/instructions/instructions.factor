@@ -16,9 +16,12 @@ V{ } clone insn-classes set-global
 ! Virtual CPU instructions, used by CFG IR
 TUPLE: insn ;
 
+! Instructions which use vregs
+TUPLE: vreg-insn < insn ;
+
 ! Instructions which are referentially transparent; used for
 ! value numbering
-TUPLE: pure-insn < insn ;
+TUPLE: pure-insn < vreg-insn ;
 
 ! Constants
 INSN: ##load-integer
@@ -297,6 +300,11 @@ PURE-INSN: ##shuffle-vector
 def: dst
 use: src shuffle
 literal: rep ;
+
+PURE-INSN: ##shuffle-vector-halves-imm
+def: dst
+use: src1 src2
+literal: shuffle rep ;
 
 PURE-INSN: ##shuffle-vector-imm
 def: dst
@@ -708,6 +716,14 @@ INSN: ##compare-integer-imm-branch
 use: src1/int-rep
 literal: src2 cc ;
 
+INSN: ##test-branch
+use: src1/int-rep src2/int-rep
+literal: cc ;
+
+INSN: ##test-imm-branch
+use: src1/int-rep
+literal: src2 cc ;
+
 PURE-INSN: ##compare-integer
 def: dst/tagged-rep
 use: src1/int-rep src2/int-rep
@@ -715,6 +731,18 @@ literal: cc
 temp: temp/int-rep ;
 
 PURE-INSN: ##compare-integer-imm
+def: dst/tagged-rep
+use: src1/int-rep
+literal: src2 cc
+temp: temp/int-rep ;
+
+PURE-INSN: ##test
+def: dst/tagged-rep
+use: src1/int-rep src2/int-rep
+literal: cc
+temp: temp/int-rep ;
+
+PURE-INSN: ##test-imm
 def: dst/tagged-rep
 use: src1/int-rep
 literal: src2 cc
@@ -793,6 +821,8 @@ UNION: conditional-branch-insn
 ##compare-imm-branch
 ##compare-integer-branch
 ##compare-integer-imm-branch
+##test-branch
+##test-imm-branch
 ##compare-float-ordered-branch
 ##compare-float-unordered-branch
 ##test-vector-branch
@@ -832,13 +862,3 @@ UNION: def-is-use-insn
 ##box-alien
 ##box-displaced-alien
 ##unbox-any-c-ptr ;
-
-SYMBOL: vreg-insn
-
-[
-    vreg-insn
-    insn-classes get [
-        "insn-slots" word-prop [ type>> { def use temp } member-eq? ] any?
-    ] filter
-    define-union-class
-] with-compilation-unit

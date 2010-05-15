@@ -301,6 +301,7 @@ HOOK: %gather-vector-2 cpu ( dst src1 src2 rep -- )
 HOOK: %gather-vector-4 cpu ( dst src1 src2 src3 src4 rep -- )
 HOOK: %shuffle-vector cpu ( dst src shuffle rep -- )
 HOOK: %shuffle-vector-imm cpu ( dst src shuffle rep -- )
+HOOK: %shuffle-vector-halves-imm cpu ( dst src1 src2 shuffle rep -- )
 HOOK: %tail>head-vector cpu ( dst src rep -- )
 HOOK: %merge-vector-head cpu ( dst src1 src2 rep -- )
 HOOK: %merge-vector-tail cpu ( dst src1 src2 rep -- )
@@ -356,6 +357,7 @@ HOOK: %gather-vector-4-reps cpu ( -- reps )
 HOOK: %alien-vector-reps cpu ( -- reps )
 HOOK: %shuffle-vector-reps cpu ( -- reps )
 HOOK: %shuffle-vector-imm-reps cpu ( -- reps )
+HOOK: %shuffle-vector-halves-imm-reps cpu ( -- reps )
 HOOK: %merge-vector-reps cpu ( -- reps )
 HOOK: %signed-pack-vector-reps cpu ( -- reps )
 HOOK: %unsigned-pack-vector-reps cpu ( -- reps )
@@ -404,6 +406,7 @@ M: object %gather-vector-4-reps { } ;
 M: object %alien-vector-reps { } ;
 M: object %shuffle-vector-reps { } ;
 M: object %shuffle-vector-imm-reps { } ;
+M: object %shuffle-vector-halves-imm-reps { } ;
 M: object %merge-vector-reps { } ;
 M: object %signed-pack-vector-reps { } ;
 M: object %unsigned-pack-vector-reps { } ;
@@ -472,15 +475,23 @@ HOOK: %call-gc cpu ( gc-roots -- )
 HOOK: %prologue cpu ( n -- )
 HOOK: %epilogue cpu ( n -- )
 
-HOOK: %compare cpu ( dst temp cc src1 src2 -- )
-HOOK: %compare-imm cpu ( dst temp cc src1 src2 -- )
-HOOK: %compare-integer-imm cpu ( dst temp cc src1 src2 -- )
-HOOK: %compare-float-ordered cpu ( dst temp cc src1 src2 -- )
-HOOK: %compare-float-unordered cpu ( dst temp cc src1 src2 -- )
+HOOK: test-instruction? cpu ( -- ? )
+
+M: object test-instruction? f ;
+
+HOOK: %compare cpu ( dst src1 src2 cc temp -- )
+HOOK: %compare-imm cpu ( dst src1 src2 cc temp -- )
+HOOK: %compare-integer-imm cpu ( dst src1 src2 cc temp -- )
+HOOK: %test cpu ( dst src1 src2 cc temp -- )
+HOOK: %test-imm cpu ( dst src1 src2 cc temp -- )
+HOOK: %compare-float-ordered cpu ( dst src1 src2 cc temp -- )
+HOOK: %compare-float-unordered cpu ( dst src1 src2 cc temp -- )
 
 HOOK: %compare-branch cpu ( label cc src1 src2 -- )
 HOOK: %compare-imm-branch cpu ( label cc src1 src2 -- )
 HOOK: %compare-integer-imm-branch cpu ( label cc src1 src2 -- )
+HOOK: %test-branch cpu ( label cc src1 src2 -- )
+HOOK: %test-imm-branch cpu ( label cc src1 src2 -- )
 HOOK: %compare-float-ordered-branch cpu ( label cc src1 src2 -- )
 HOOK: %compare-float-unordered-branch cpu ( label cc src1 src2 -- )
 
