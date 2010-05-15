@@ -22,23 +22,23 @@ IN: cpu.x86.features
 
         CPUID
 
-        ECX HEX: 100000 TEST
-        "sse-42" get JNE
+        ECX 20 BT
+        "sse-42" get JB
 
-        ECX HEX: 80000 TEST
-        "sse-41" get JNE
+        ECX 19 BT
+        "sse-41" get JB
 
-        ECX HEX: 200 TEST
-        "ssse-3" get JNE
+        ECX  9 BT
+        "ssse-3" get JB
 
-        ECX HEX: 1 TEST
-        "sse-3" get JNE
+        ECX  0 BT
+        "sse-3" get JB
 
-        EDX HEX: 4000000 TEST
-        "sse-2" get JNE
+        EDX 26 BT
+        "sse-2" get JB
 
-        EDX HEX: 2000000 TEST
-        "sse-1" get JNE
+        EDX 25 BT
+        "sse-1" get JB
 
         int-regs return-reg 0 MOV
         "end" get JMP
@@ -82,6 +82,15 @@ MEMO: sse-version ( -- n )
 : ssse3? ( -- ? ) sse-version 33 >= ;
 : sse4.1? ( -- ? ) sse-version 41 >= ;
 : sse4.2? ( -- ? ) sse-version 42 >= ;
+
+: popcnt? ( -- ? )
+    bool { } cdecl [
+        int-regs return-reg 1 MOV
+        CPUID
+        ECX 23 BT
+        int-regs return-reg dup XOR
+        int-regs return-reg SETB
+    ] alien-assembly ;
 
 : sse-string ( version -- string )
     {

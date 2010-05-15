@@ -152,8 +152,11 @@ M: register displacement, drop ;
 : immediate-operand-size-bit ( dst imm reg,rex.w,opcode -- imm dst reg,rex.w,opcode )
     over integer? [ first3 BIN: 1 opcode-or 3array ] when ;
 
+: immediate-1* ( dst imm reg,rex.w,opcode -- )
+    swap [ 1-operand ] dip 1, ;
+
 : immediate-1 ( dst imm reg,rex.w,opcode -- )
-    immediate-operand-size-bit swap [ 1-operand ] dip 1, ;
+    immediate-operand-size-bit immediate-1* ;
 
 : immediate-4 ( dst imm reg,rex.w,opcode -- )
     immediate-operand-size-bit swap [ 1-operand ] dip 4, ;
@@ -238,6 +241,9 @@ M: operand CALL { BIN: 010 t HEX: ff } 1-operand ;
 GENERIC# JUMPcc 1 ( addr opcode -- )
 M: integer JUMPcc extended-opcode, 4, ;
 
+: SETcc ( dst opcode -- )
+    { BIN: 000 t } swap suffix 1-operand ;
+
 PRIVATE>
 
 : JO  ( dst -- ) HEX: 80 JUMPcc ;
@@ -256,6 +262,23 @@ PRIVATE>
 : JGE ( dst -- ) HEX: 8d JUMPcc ;
 : JLE ( dst -- ) HEX: 8e JUMPcc ;
 : JG  ( dst -- ) HEX: 8f JUMPcc ;
+
+: SETO  ( dst -- ) { HEX: 0f HEX: 90 } SETcc ;
+: SETNO ( dst -- ) { HEX: 0f HEX: 91 } SETcc ;
+: SETB  ( dst -- ) { HEX: 0f HEX: 92 } SETcc ;
+: SETAE ( dst -- ) { HEX: 0f HEX: 93 } SETcc ;
+: SETE  ( dst -- ) { HEX: 0f HEX: 94 } SETcc ;
+: SETNE ( dst -- ) { HEX: 0f HEX: 95 } SETcc ;
+: SETBE ( dst -- ) { HEX: 0f HEX: 96 } SETcc ;
+: SETA  ( dst -- ) { HEX: 0f HEX: 97 } SETcc ;
+: SETS  ( dst -- ) { HEX: 0f HEX: 98 } SETcc ;
+: SETNS ( dst -- ) { HEX: 0f HEX: 99 } SETcc ;
+: SETP  ( dst -- ) { HEX: 0f HEX: 9a } SETcc ;
+: SETNP ( dst -- ) { HEX: 0f HEX: 9b } SETcc ;
+: SETL  ( dst -- ) { HEX: 0f HEX: 9c } SETcc ;
+: SETGE ( dst -- ) { HEX: 0f HEX: 9d } SETcc ;
+: SETLE ( dst -- ) { HEX: 0f HEX: 9e } SETcc ;
+: SETG  ( dst -- ) { HEX: 0f HEX: 9f } SETcc ;
 
 : LEAVE ( -- ) HEX: c9 , ;
 
@@ -303,6 +326,22 @@ M: operand TEST OCT: 204 2-operand ;
 : XCHG ( dst src -- ) OCT: 207 2-operand ;
 
 : BSR ( dst src -- ) { HEX: 0f HEX: bd } (2-operand) ;
+
+GENERIC: BT ( value n -- )
+M: immediate BT ( value n -- ) { BIN: 100 t { HEX: 0f HEX: ba } } immediate-1* ;
+M: operand   BT ( value n -- ) swap { HEX: 0f HEX: a3 } (2-operand) ;
+
+GENERIC: BTC ( value n -- )
+M: immediate BTC ( value n -- ) { BIN: 111 t { HEX: 0f HEX: ba } } immediate-1* ;
+M: operand   BTC ( value n -- ) swap { HEX: 0f HEX: bb } (2-operand) ;
+
+GENERIC: BTR ( value n -- )
+M: immediate BTR ( value n -- ) { BIN: 110 t { HEX: 0f HEX: ba } } immediate-1* ;
+M: operand   BTR ( value n -- ) swap { HEX: 0f HEX: b3 } (2-operand) ;
+
+GENERIC: BTS ( value n -- )
+M: immediate BTS ( value n -- ) { BIN: 101 t { HEX: 0f HEX: ba } } immediate-1* ;
+M: operand   BTS ( value n -- ) swap { HEX: 0f HEX: ab } (2-operand) ;
 
 : NOT  ( dst -- ) { BIN: 010 t HEX: f7 } 1-operand ;
 : NEG  ( dst -- ) { BIN: 011 t HEX: f7 } 1-operand ;

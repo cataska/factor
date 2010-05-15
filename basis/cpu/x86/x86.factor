@@ -164,6 +164,7 @@ M: x86 %max     int-rep two-operand [ CMP ] [ CMOVL ] 2bi ;
 M: x86 %not     int-rep one-operand NOT ;
 M: x86 %neg     int-rep one-operand NEG ;
 M: x86 %log2    BSR ;
+M: x86 %bit-count POPCNT ;
 
 ! A bit of logic to avoid using MOVSS/MOVSD for reg-reg moves
 ! since this induces partial register stalls
@@ -1533,7 +1534,7 @@ enable-float-min/max
 enable-fsqrt
 
 : check-sse ( -- )
-    [ { (sse-version) } compile ] with-optimizer
+    [ { (sse-version) popcnt? } compile ] with-optimizer
     sse-version 20 < [
         "Factor requires SSE2, which your CPU does not support." print
         flush
