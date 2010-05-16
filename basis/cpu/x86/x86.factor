@@ -38,11 +38,7 @@ HOOK: extra-stack-space cpu ( stack-frame -- n )
     stack-frame get extra-stack-space +
     reserved-stack-space + ;
 
-: special@ ( n -- op ) special-offset stack@ ;
-
-: spill@ ( n -- op ) spill-offset special@ ;
-
-: param@ ( n -- op ) reserved-stack-space + stack@ ;
+: spill@ ( n -- op ) spill-offset special-offset stack@ ;
 
 : gc-root-offsets ( seq -- seq' )
     [ n>> spill-offset special-offset cell + ] map f like ;
@@ -62,10 +58,6 @@ M: x86 stack-frame-size ( stack-frame -- i )
     3 cells +
     align-stack ;
 
-! Must be a volatile register not used for parameter passing or
-! integer return
-HOOK: temp-reg cpu ( -- reg )
-
 HOOK: pic-tail-reg cpu ( -- reg )
 
 M: x86 complex-addressing? t ;
@@ -82,6 +74,12 @@ M: x86 %load-reference
     [ swap 0 MOV rc-absolute-cell rel-literal ]
     [ \ f type-number MOV ]
     if* ;
+
+M: x86 %load-float ( dst val -- )
+    <float> float-rep %load-vector ;
+
+M: x86 %load-double ( dst val -- )
+    <double> double-rep %load-vector ;
 
 HOOK: ds-reg cpu ( -- reg )
 HOOK: rs-reg cpu ( -- reg )
@@ -744,6 +742,18 @@ M: x86 %gather-vector-4-reps
         { sse2? { float-4-rep int-4-rep uint-4-rep } }
     } available-reps ;
 
+M:: x86 %gather-int-vector-4 ( dst src1 src2 src3 src4 rep -- )
+    dst rep %zero-vector
+    dst src1 32-bit-version-of 0 PINSRD
+    dst src2 32-bit-version-of 1 PINSRD
+    dst src3 32-bit-version-of 2 PINSRD
+    dst src4 32-bit-version-of 3 PINSRD ;
+
+M: x86 %gather-int-vector-4-reps
+    {
+        { sse4.1? { int-4-rep uint-4-rep } }
+    } available-reps ;
+
 M:: x86 %gather-vector-2 ( dst src1 src2 rep -- )
     rep signed-rep {
         { double-2-rep [
@@ -759,6 +769,61 @@ M:: x86 %gather-vector-2 ( dst src1 src2 rep -- )
 M: x86 %gather-vector-2-reps
     {
         { sse2? { double-2-rep longlong-2-rep ulonglong-2-rep } }
+    } available-reps ;
+
+M:: x86.64 %gather-int-vector-2 ( dst src1 src2 rep -- )
+    dst rep %zero-vector
+    dst src1 0 PINSRQ
+    dst src2 1 PINSRQ ;
+
+M: x86.64 %gather-int-vector-2-reps
+    {
+        { sse4.1? { longlong-2-rep ulonglong-2-rep } }
+    } available-reps ;
+
+:: %select-vector-32 ( dst src n rep -- )
+    rep {
+        { char-16-rep [
+            dst 32-bit-version-of src n PEXTRB
+            dst dst 8-bit-version-of MOVSX
+        ] }
+        { uchar-16-rep [
+            dst 32-bit-version-of src n PEXTRB
+        ] }
+        { short-8-rep [
+            dst 32-bit-version-of src n PEXTRW
+            dst dst 16-bit-version-of MOVSX
+        ] }
+        { ushort-8-rep [
+            dst 32-bit-version-of src n PEXTRW
+        ] }
+        { int-4-rep [
+            dst 32-bit-version-of src n PEXTRD
+            dst dst 32-bit-version-of 2dup = [ 2drop ] [ MOVSX ] if
+        ] }
+        { uint-4-rep [
+            dst 32-bit-version-of src n PEXTRD
+        ] }
+    } case ;
+
+M: x86.32 %select-vector
+    %select-vector-32 ;
+
+M: x86.32 %select-vector-reps
+    {
+        { sse4.1? { uchar-16-rep char-16-rep ushort-8-rep short-8-rep uint-4-rep int-4-rep } }
+    } available-reps ;
+
+M: x86.64 %select-vector
+    {
+        { longlong-2-rep  [ PEXTRQ ] }
+        { ulonglong-2-rep [ PEXTRQ ] }
+        [ %select-vector-32 ]
+    } case ;
+
+M: x86.64 %select-vector-reps
+    {
+        { sse4.1? { uchar-16-rep char-16-rep ushort-8-rep short-8-rep uint-4-rep int-4-rep ulonglong-2-rep longlong-2-rep } }
     } available-reps ;
 
 : sse1-float-4-shuffle ( dst shuffle -- )
@@ -1478,16 +1543,27 @@ M:: x86 %spill ( src rep dst -- )
 M:: x86 %reload ( dst rep src -- )
     dst src rep %copy ;
 
-M:: x86 %store-reg-param ( src reg rep -- )
-    reg src rep %copy ;
-
 M:: x86 %store-stack-param ( src n rep -- )
-    n param@ src rep %copy ;
+    n reserved-stack-space + stack@ src rep %copy ;
 
-HOOK: struct-return@ cpu ( n -- operand )
+: %load-return ( dst rep -- )
+    [ reg-class-of return-regs at first ] keep %load-reg-param ;
 
-M: x86 %prepare-struct-area ( dst -- )
-    f struct-return@ LEA ;
+: %store-return ( dst rep -- )
+    [ reg-class-of return-regs at first ] keep %store-reg-param ;
+
+: next-stack@ ( n -- operand )
+    #! nth parameter from the next stack frame. Used to box
+    #! input values to callbacks; the callback has its own
+    #! stack frame set up, and we want to read the frame
+    #! set up by the caller.
+    frame-reg swap 2 cells + [+] ;
+
+M:: x86 %load-stack-param ( dst n rep -- )
+    dst n next-stack@ rep %copy ;
+
+M: x86 %prepare-struct-caller ( dst -- )
+    return-offset special-offset stack@ LEA ;
 
 M: x86 %alien-indirect ( src -- )
     ?spill-slot CALL ;
@@ -1517,13 +1593,6 @@ M: x86 immediate-arithmetic? ( n -- ? )
 
 M: x86 immediate-bitwise? ( n -- ? )
     HEX: -80000000 HEX: 7fffffff between? ;
-
-: next-stack@ ( n -- operand )
-    #! nth parameter from the next stack frame. Used to box
-    #! input values to callbacks; the callback has its own
-    #! stack frame set up, and we want to read the frame
-    #! set up by the caller.
-    frame-reg swap 2 cells + [+] ;
 
 enable-min/max
 enable-log2

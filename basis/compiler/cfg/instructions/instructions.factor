@@ -295,10 +295,25 @@ def: dst
 use: src1/scalar-rep src2/scalar-rep
 literal: rep ;
 
+PURE-INSN: ##gather-int-vector-2
+def: dst
+use: src1/int-rep src2/int-rep
+literal: rep ;
+
 PURE-INSN: ##gather-vector-4
 def: dst
 use: src1/scalar-rep src2/scalar-rep src3/scalar-rep src4/scalar-rep
 literal: rep ;
+
+PURE-INSN: ##gather-int-vector-4
+def: dst
+use: src1/int-rep src2/int-rep src3/int-rep src4/int-rep
+literal: rep ;
+
+PURE-INSN: ##select-vector
+def: dst/int-rep
+use: src
+literal: n rep ;
 
 PURE-INSN: ##shuffle-vector
 def: dst
@@ -631,35 +646,32 @@ INSN: ##store-stack-param
 use: src
 literal: n rep ;
 
-INSN: ##store-return
-use: src
-literal: rep ;
+INSN: ##load-reg-param
+def: dst
+literal: reg rep ;
 
-INSN: ##store-struct-return
-use: src/int-rep
-literal: c-type ;
+INSN: ##load-stack-param
+def: dst
+literal: n rep ;
 
-INSN: ##store-long-long-return
-use: src1/int-rep src2/int-rep ;
-
-INSN: ##prepare-struct-area
+INSN: ##prepare-struct-caller
 def: dst/int-rep ;
 
 INSN: ##box
 def: dst/tagged-rep
-literal: n rep boxer ;
+use: src
+literal: boxer rep ;
 
 INSN: ##box-long-long
 def: dst/tagged-rep
-literal: n boxer ;
+use: src1/int-rep src2/int-rep
+literal: boxer ;
 
-INSN: ##box-small-struct
+INSN: ##allot-byte-array
 def: dst/tagged-rep
-literal: c-type ;
+literal: size ;
 
-INSN: ##box-large-struct
-def: dst/tagged-rep
-literal: n c-type ;
+INSN: ##prepare-var-args ;
 
 INSN: ##alien-invoke
 literal: symbols dll ;
@@ -672,9 +684,6 @@ use: src/int-rep ;
 
 INSN: ##alien-assembly
 literal: quot ;
-
-INSN: ##save-param-reg
-literal: offset reg rep ;
 
 INSN: ##begin-callback ;
 
@@ -839,26 +848,30 @@ UNION: conditional-branch-insn
 UNION: ##read ##slot ##slot-imm ##vm-field ##alien-global ;
 UNION: ##write ##set-slot ##set-slot-imm ##set-vm-field ;
 
-! Instructions that clobber registers
-UNION: clobber-insn
-##call-gc
-##unary-float-function
-##binary-float-function
-##box
-##box-long-long
-##box-small-struct
-##box-large-struct
-##unbox
+! Instructions that clobber registers. They receive inputs and
+! produce outputs in spill slots.
+UNION: hairy-clobber-insn
+##load-reg-param
 ##store-reg-param
-##store-return
-##store-struct-return
-##store-long-long-return
+##call-gc
 ##alien-invoke
 ##alien-indirect
 ##alien-assembly
-##save-param-reg
 ##begin-callback
 ##end-callback ;
+
+! Instructions that clobber registers but are allowed to produce
+! outputs in registers. Inputs are in spill slots, except for
+! inputs coalesced with the output, in which case that input
+! will be in a register.
+UNION: clobber-insn
+hairy-clobber-insn
+##unary-float-function
+##binary-float-function
+##unbox
+##box
+##box-long-long
+##allot-byte-array ;
 
 ! Instructions that have complex expansions and require that the
 ! output registers are not equal to any of the input registers
