@@ -7,15 +7,20 @@ words compiler.constants compiler.codegen.fixup
 compiler.cfg.instructions compiler.cfg.builder
 compiler.cfg.builder.alien.boxing compiler.cfg.intrinsics
 compiler.cfg.stack-frame cpu.x86.assembler
-cpu.x86.assembler.operands cpu.x86 cpu.architecture vm ;
+cpu.x86.assembler.operands cpu.x86 cpu.architecture vm vocabs ;
 FROM: layouts => cell ;
 IN: cpu.x86.32
 
+: x86-float-regs ( -- seq )
+    "cpu.x86.sse" vocab
+    { XMM0 XMM1 XMM2 XMM3 XMM4 XMM5 XMM6 XMM7 }
+    { ST0 ST1 ST2 ST3 ST4 ST5 ST6 }
+    ? ;
+
 M: x86.32 machine-registers
-    {
-        { int-regs { EAX ECX EDX EBP EBX } }
-        { float-regs { XMM0 XMM1 XMM2 XMM3 XMM4 XMM5 XMM6 XMM7 } }
-    } ;
+    { int-regs { EAX ECX EDX EBP EBX } }
+    float-regs x86-float-regs 2array
+    2array ;
 
 M: x86.32 ds-reg ESI ;
 M: x86.32 rs-reg EDI ;
@@ -38,8 +43,6 @@ M: x86.32 %set-vm-field ( dst field -- )
 
 M: x86.32 %vm-field-ptr ( dst field -- )
     [ 0 MOV ] dip rc-absolute-cell rel-vm ;
-
-M: x86.32 extra-stack-space calls-vm?>> 16 0 ? ;
 
 M: x86.32 %mark-card
     drop HEX: ffffffff [+] card-mark <byte> MOV
@@ -71,6 +74,8 @@ M: x86.32 pic-tail-reg EDX ;
 
 M: x86.32 reserved-stack-space 0 ;
 
+M: x86.32 vm-stack-space 16 ;
+
 : save-vm-ptr ( n -- )
     stack@ 0 MOV 0 rc-absolute-cell rel-vm ;
 
@@ -94,7 +99,7 @@ M: x86.32 param-regs
 M: x86.32 return-regs
     {
         { int-regs { EAX EDX } }
-        { float-regs { f } }
+        { float-regs { ST0 } }
     } ;
 
 M: x86.32 %prologue ( n -- )
@@ -105,38 +110,38 @@ M: x86.32 %prologue ( n -- )
 M: x86.32 %prepare-jump
     pic-tail-reg 0 MOV xt-tail-pic-offset rc-absolute-cell rel-here ;
 
-:: load-float-return ( dst x87-insn sse-insn -- )
+:: load-float-return ( dst x87-insn rep -- )
     dst register? [
         ESP 4 SUB
         ESP [] x87-insn execute
-        dst ESP [] sse-insn execute
+        dst ESP [] rep %copy
         ESP 4 ADD
     ] [
-        dst x87-insn execute
+        dst ?spill-slot x87-insn execute
     ] if ; inline
 
 M: x86.32 %load-reg-param ( dst reg rep -- )
-    [ ?spill-slot ] dip {
-        { int-rep [ MOV ] }
-        { float-rep [ drop \ FSTPS \ MOVSS load-float-return ] }
-        { double-rep [ drop \ FSTPL \ MOVSD load-float-return ] }
+    {
+        { int-rep [ int-rep %copy ] }
+        { float-rep [ drop \ FSTPS float-rep load-float-return ] }
+        { double-rep [ drop \ FSTPL double-rep load-float-return ] }
     } case ;
 
-:: store-float-return ( src x87-insn sse-insn -- )
+:: store-float-return ( src x87-insn rep -- )
     src register? [
         ESP 4 SUB
-        ESP [] src sse-insn execute
+        ESP [] src rep %copy
         ESP [] x87-insn execute
         ESP 4 ADD
     ] [
-        src x87-insn execute
+        src ?spill-slot x87-insn execute
     ] if ; inline
 
 M: x86.32 %store-reg-param ( src reg rep -- )
-    [ ?spill-slot ] dip {
-        { int-rep [ swap MOV ] }
-        { float-rep [ \ FLDS \ MOVSS store-float-return ] }
-        { double-rep [ \ FLDL \ MOVSD store-float-return ] }
+    {
+        { int-rep [ swap int-rep %copy ] }
+        { float-rep [ drop \ FLDS float-rep store-float-return ] }
+        { double-rep [ drop \ FLDL double-rep store-float-return ] }
     } case ;
 
 :: call-unbox-func ( src func -- )
@@ -158,8 +163,10 @@ M:: x86.32 %box ( dst src func rep -- )
 
 M:: x86.32 %box-long-long ( dst src1 src2 func -- )
     8 save-vm-ptr
-    4 stack@ src1 int-rep %copy
-    0 stack@ src2 int-rep %copy
+    EAX src1 int-rep %copy
+    0 stack@ EAX int-rep %copy
+    EAX src2 int-rep %copy
+    4 stack@ EAX int-rep %copy
     func f %alien-invoke
     dst EAX tagged-rep %copy ;
 
@@ -184,34 +191,27 @@ M: x86.32 %end-callback ( -- )
     0 save-vm-ptr
     "end_callback" f %alien-invoke ;
 
-GENERIC: float-function-param ( stack-slot dst src -- )
+GENERIC: float-function-param ( n dst src -- )
 
-M:: spill-slot float-function-param ( stack-slot dst src -- )
+M:: spill-slot float-function-param ( n dst src -- )
     ! We can clobber dst here since its going to contain the
     ! final result
     dst src double-rep %copy
-    stack-slot dst double-rep %copy ;
+    dst n double-rep %store-stack-param ;
 
-M: register float-function-param
-    nip double-rep %copy ;
-
-: float-function-return ( reg -- )
-    ESP [] FSTPL
-    ESP [] MOVSD
-    ESP 16 ADD ;
+M:: register float-function-param ( n dst src -- )
+    src n double-rep %store-stack-param ;
 
 M:: x86.32 %unary-float-function ( dst src func -- )
-    ESP -16 [+] dst src float-function-param
-    ESP 16 SUB
+    0 dst src float-function-param
     func "libm" load-library %alien-invoke
-    dst float-function-return ;
+    dst double-rep %load-return ;
 
 M:: x86.32 %binary-float-function ( dst src1 src2 func -- )
-    ESP -16 [+] dst src1 float-function-param
-    ESP  -8 [+] dst src2 float-function-param
-    ESP 16 SUB
+    0 dst src1 float-function-param
+    8 dst src2 float-function-param
     func "libm" load-library %alien-invoke
-    dst float-function-return ;
+    dst double-rep %load-return ;
 
 : funny-large-struct-return? ( return abi -- ? )
     #! MINGW ABI incompatibility disaster

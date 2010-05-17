@@ -96,8 +96,7 @@ M: array dlsym-valid? '[ _ dlsym ] any? ;
 : <alien-stack-frame> ( stack-size return -- stack-frame )
     stack-frame new
         swap return-size >>return
-        swap >>params
-        t >>calls-vm? ;
+        swap >>params ;
 
 : emit-stack-frame ( stack-size params -- )
     [ return>> ] [ abi>> ] bi
@@ -178,9 +177,14 @@ M: #alien-assembly emit-node
     [ nip xt>> ] [ [ return>> ] [ abi>> ] bi stack-cleanup ] 2bi
     "stack-cleanup" set-word-prop ;
 
+: needs-frame-pointer ( -- )
+    cfg get t >>frame-pointer? drop ;
+
 M: #alien-callback emit-node
     dup params>> xt>> dup
     [
+        needs-frame-pointer
+
         ##prologue
         [
             {
