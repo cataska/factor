@@ -5,7 +5,8 @@ io.backend io.pathnames io.streams.string kernel
 math memory namespaces namespaces.private parser
 quotations sequences specialized-arrays stack-checker
 stack-checker.errors system threads tools.test words
-alien.complex concurrency.promises ;
+alien.complex concurrency.promises alien.data
+byte-arrays classes ;
 FROM: alien.c-types => float short ;
 SPECIALIZED-ARRAY: float
 SPECIALIZED-ARRAY: char
@@ -455,11 +456,11 @@ STRUCT: double-rect
     void { void* void* double-rect } cdecl alien-indirect
     "example" get-global ;
 
-[ 1.0 2.0 3.0 4.0 ]
+[ byte-array 1.0 2.0 3.0 4.0 ]
 [
     1.0 2.0 3.0 4.0 <double-rect>
     double-rect-callback double-rect-test
-    >double-rect<
+    [ >c-ptr class ] [ >double-rect< ] bi
 ] unit-test
 
 STRUCT: test_struct_14
@@ -761,3 +762,8 @@ mingw? [
 
 [ S{ test-struct-11 f 7 -3 } ]
 [ 3 4 7 fastcall-struct-return-iii-callback fastcall-struct-return-iii-indirect ] unit-test
+
+! Stack allocation
+: blah ( -- x ) { RECT } [ 1.5 >>x 2.0 >>y [ x>> ] [ y>> ] bi * >fixnum ] with-scoped-allocation ;
+
+[ 3 ] [ blah ] unit-test

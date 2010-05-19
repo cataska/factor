@@ -580,11 +580,13 @@ HOOK: struct-return-on-stack? cpu ( -- ? )
 ! can be passed to a C function, or returned from a callback
 HOOK: %unbox cpu ( dst src func rep -- )
 
+HOOK: %unbox-long-long cpu ( src out func -- )
+
 HOOK: %store-reg-param cpu ( src reg rep -- )
 
 HOOK: %store-stack-param cpu ( src n rep -- )
 
-HOOK: %prepare-struct-caller cpu ( dst -- )
+HOOK: %local-allot cpu ( dst size offset -- )
 
 ! Call a function to convert a value into a tagged pointer,
 ! possibly allocating a bignum, float, or alien instance,
