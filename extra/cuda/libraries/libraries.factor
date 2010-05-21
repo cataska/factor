@@ -1,13 +1,15 @@
 ! Copyright (C) 2010 Doug Coleman.
 ! See http://factorcode.org/license.txt for BSD license.
-USING: accessors alien.data alien.parser arrays
-assocs combinators cuda cuda.ffi fry io.backend kernel macros
-math namespaces sequences words ;
+USING: accessors alien.data alien.parser arrays assocs
+byte-arrays classes.struct combinators combinators.short-circuit
+cuda cuda.ffi fry generalizations io.backend kernel macros math
+namespaces sequences variants words ;
+FROM: classes.struct.private => compute-struct-offsets write-struct-slot ;
 QUALIFIED-WITH: alien.c-types c
 IN: cuda.libraries
 
-SYMBOL: cuda-module
-SYMBOL: cuda-function
+VARIANT: cuda-abi
+    cuda32 cuda64 ;
 
 SYMBOL: cuda-modules
 SYMBOL: cuda-functions
@@ -20,53 +22,26 @@ SYMBOL: current-cuda-library
 : ?delete-at ( key assoc -- old/key ? )
     2dup delete-at* [ 2nip t ] [ 2drop f ] if ; inline
 
-: cuda-int* ( function offset value -- )
-    cuParamSeti cuda-error ; inline
-
-: cuda-int ( offset value -- )
-    [ cuda-function get ] 2dip cuda-int* ; inline
-
-: cuda-float* ( function offset value -- )
-    cuParamSetf cuda-error ; inline
-
-: cuda-float ( offset value -- )
-    [ cuda-function get ] 2dip cuda-float* ; inline
-
-: cuda-vector* ( function offset ptr n -- )
-    cuParamSetv cuda-error ; inline
-
-: cuda-vector ( offset ptr n -- )
-    [ cuda-function get ] 3dip cuda-vector* ; inline
-
-: param-size* ( function n -- )
+: cuda-param-size ( function n -- )
     cuParamSetSize cuda-error ; inline
 
-: param-size ( n -- )
-    [ cuda-function get ] dip param-size* ; inline
+: cuda-vector ( function offset ptr n -- )
+    cuParamSetv cuda-error ; inline
 
-: launch-function-grid* ( function width height -- )
+: launch-function-grid ( function width height -- )
     cuLaunchGrid cuda-error ; inline
 
-: launch-function-grid ( width height -- )
-    [ cuda-function get ] 2dip
-    cuLaunchGrid cuda-error ; inline
-
-: function-block-shape* ( function x y z -- )
+: function-block-shape ( function x y z -- )
     cuFuncSetBlockShape cuda-error ; inline
 
-: function-block-shape ( x y z -- )
-    [ cuda-function get ] 3dip
-    cuFuncSetBlockShape cuda-error ; inline
-
-: function-shared-size* ( function n -- )
-    cuFuncSetSharedSize cuda-error ; inline
-
-: function-shared-size ( n -- )
-    [ cuda-function get ] dip
+: function-shared-size ( function n -- )
     cuFuncSetSharedSize cuda-error ; inline
 
 TUPLE: grid
-dim-grid dim-block shared-size stream ;
+    { dim-grid read-only }
+    { dim-block read-only }
+    { shared-size read-only initial: 0 }
+    { stream read-only } ;
 
 : <grid> ( dim-grid dim-block -- grid )
     0 f grid boa ; inline
@@ -77,20 +52,25 @@ dim-grid dim-block shared-size stream ;
 : <grid-shared-stream> ( dim-grid dim-block shared-size stream -- grid )
     grid boa ; inline
 
-: c-type>cuda-setter ( c-type -- n cuda-type )
-    {
-        { [ dup c:int = ] [ drop 4 [ cuda-int* ] ] }
-        { [ dup c:uint = ] [ drop 4 [ cuda-int* ] ] }
-        { [ dup c:float = ] [ drop 4 [ cuda-float* ] ] }
-        { [ dup c:pointer? ] [ drop 4 [ cuda-int* ] ] }
-        { [ dup c:void* = ] [ drop 4 [ cuda-int* ] ] }
-    } cond ;
-
 <PRIVATE
-: block-dim ( block -- x y z )
-    dup sequence? [ 3 1 pad-tail first3 ] [ 1 1 ] if ; inline
-: grid-dim ( block -- x y )
-    dup sequence? [ 2 1 pad-tail first2 ] [ 1 ] if ; inline
+GENERIC: block-dim ( block-size -- x y z ) foldable
+M: integer block-dim 1 1 ; inline
+M: sequence block-dim
+    dup length {
+        { 0 [ drop 1 1 1 ] }
+        { 1 [ first 1 1 ] }
+        { 2 [ first2 1 ] }
+        [ drop first3 ]
+    } case ; inline
+
+GENERIC: grid-dim ( grid-size -- x y ) foldable
+M: integer grid-dim 1 ; inline
+M: sequence grid-dim
+    dup length {
+        { 0 [ drop 1 1 ] }
+        { 1 [ first 1 ] }
+        [ drop first2 ]
+    } case ; inline
 PRIVATE>
 
 : load-module ( path -- module )
@@ -114,38 +94,65 @@ ERROR: no-cuda-library name ;
 : unload-cuda-library ( name -- )
     remove-cuda-library handle>> unload-module ;
 
-: launch-function* ( function -- ) cuLaunch cuda-error ; inline
-
-: launch-function ( -- ) cuda-function get cuLaunch cuda-error ; inline
+: launch-function ( function -- ) cuLaunch cuda-error ; inline
 
 : run-grid ( grid function -- )
     swap
     {
-        [ dim-block>> block-dim function-block-shape* ]
-        [ shared-size>> function-shared-size* ]
+        [ dim-block>> block-dim function-block-shape ]
+        [ shared-size>> function-shared-size ]
         [
             dim-grid>>
-            [ grid-dim launch-function-grid* ]
-            [ launch-function* ] if*
+            [ grid-dim launch-function-grid ]
+            [ launch-function ] if*
         ]
-    } 2cleave ;
+    } 2cleave ; inline
 
-: cuda-argument-setter ( offset c-type -- offset' quot )
-    c-type>cuda-setter
-    [ over [ + ] dip ] dip
-    '[ swap _ swap _ call ] ;
+<PRIVATE
+: make-param-buffer ( function size -- buffer size )
+    [ cuda-param-size ] [ (byte-array) ] [ ] tri ; inline
 
-MACRO: cuda-arguments ( c-types -- quot: ( args... function -- ) )
-    [ 0 ] dip [ cuda-argument-setter ] map reverse
-    swap '[ _ param-size* ] suffix
-    '[ _ cleave ] ;
+: fill-param-buffer ( values... buffer quots... n -- )
+    [ cleave-curry ] [ spread* ] bi ; inline
 
-: get-function-ptr* ( module string -- function )
+: pointer-argument-type? ( c-type -- ? )
+    { [ c:void* = ] [ CUdeviceptr = ] [ c:pointer? ] } 1|| ;
+
+: abi-pointer-type ( abi -- type )
+    {
+        { cuda32 [ c:uint ] }
+        { cuda64 [ CUulonglong ] }
+    } case ;
+
+: >argument-type ( c-type abi -- c-type' )
+    swap {
+        { [ dup pointer-argument-type? ] [ drop abi-pointer-type ] }
+        { [ dup c:double    = ] [ 2drop CUdouble ] }
+        { [ dup c:longlong  = ] [ 2drop CUlonglong ] }
+        { [ dup c:ulonglong = ] [ 2drop CUulonglong ] }
+        [ nip ]
+    } cond ;
+
+: >argument-struct-slot ( c-type abi -- slot )
+    >argument-type "cuda-arg" swap { } <struct-slot-spec> ;
+
+: [cuda-arguments] ( c-types abi -- quot )
+    '[ _ >argument-struct-slot ] map
+    [ compute-struct-offsets ]
+    [ [ '[ _ write-struct-slot ] ] [ ] map-as ]
+    [ length ] tri
+    '[
+        [ _ make-param-buffer [ drop @ _ fill-param-buffer ] 2keep ]
+        [ '[ _ 0 ] 2dip cuda-vector ] bi
+    ] ;
+PRIVATE>
+
+MACRO: cuda-arguments ( c-types abi -- quot: ( args... function -- ) )
+    [ [ 0 cuda-param-size ] ] swap '[ _ [cuda-arguments] ] if-empty ;
+
+: get-function-ptr ( module string -- function )
     [ CUfunction <c-object> ] 2dip
     [ cuModuleGetFunction cuda-error ] 3keep 2drop c:*void* ;
-
-: get-function-ptr ( string -- function )
-    [ cuda-module get ] dip get-function-ptr* ;
 
 : cached-module ( module-name -- alien )
     lookup-cuda-library
@@ -153,27 +160,44 @@ MACRO: cuda-arguments ( c-types -- quot: ( args... function -- ) )
 
 : cached-function ( module-name function-name -- alien )
     [ cached-module ] dip
-    2array cuda-functions get [ first2 get-function-ptr* ] cache ;
+    2array cuda-functions get [ first2 get-function-ptr ] cache ;
 
-: define-cuda-word ( word module-name function-name arguments -- )
-    [
-        '[
-            _ _ cached-function
-            [ nip _ cuda-arguments ]
-            [ run-grid ] 2bi
-        ]
-    ]
+MACRO: cuda-invoke ( module-name function-name arguments -- )
+    pick lookup-cuda-library abi>> '[
+        _ _ cached-function
+        [ nip _ _ cuda-arguments ]
+        [ run-grid ] 2bi
+    ] ;
+
+: cuda-global* ( module-name symbol-name -- device-ptr size )
+    [ CUdeviceptr <c-object> c:uint <c-object> ] 2dip
+    [ cached-module ] dip 
+    '[ _ _ cuModuleGetGlobal cuda-error ] 2keep [ c:*uint ] bi@ ; inline
+
+: cuda-global ( module-name symbol-name -- device-ptr )
+    cuda-global* drop ; inline
+
+: define-cuda-function ( word module-name function-name arguments -- )
+    [ '[ _ _ _ cuda-invoke ] ]
     [ 2nip \ grid suffix c:void function-effect ]
-    3bi define-declared ;
+    3bi define-inline ;
 
-TUPLE: cuda-library name path handle ;
+: define-cuda-global ( word module-name symbol-name -- )
+    '[ _ _ cuda-global ] (( -- device-ptr )) define-inline ;
 
-: <cuda-library> ( name path -- obj )
+TUPLE: cuda-library name abi path handle ;
+ERROR: bad-cuda-abi abi ;
+
+: check-cuda-abi ( abi -- abi )
+    dup cuda-abi? [ bad-cuda-abi ] unless ; inline
+
+: <cuda-library> ( name abi path -- obj )
     \ cuda-library new
         swap >>path
-        swap >>name ;
+        swap check-cuda-abi >>abi
+        swap >>name ; inline
 
-: add-cuda-library ( name path -- )
+: add-cuda-library ( name abi path -- )
     normalize-path <cuda-library>
     dup name>> cuda-libraries get-global set-at ;
 
