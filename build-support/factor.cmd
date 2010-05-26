@@ -1,59 +1,77 @@
 @echo off
-if not exist Nmakefile goto wrong_dir
+setlocal
 
-if /i %PROCESSOR_ARCHITECTURE%==AMD64 (
-    set _target="x86-64"
-    set _bootimage="boot.winnt-x86.64.image"
+if "%1"=="/?" (
+    goto usage
+) else if "%1"=="" (
+    set _bootimage_version=latest
+) else if "%1"=="latest" (
+    set _bootimage_version=latest
+) else if "%1"=="clean" (
+    set _bootimage_version=clean
+) else goto usage
+
+if not exist Nmakefile goto wrongdir
+
+call cl 2>&1 | find "x86" >nul
+if not errorlevel 1 (
+    echo x86-32 cl.exe detected.
+    set _target=x86-32
+    set _bootimage=boot.winnt-x86.32.image
 ) else (
-    set _target="x86-32"
-    set _bootimage="boot.winnt-x86.32.image"
+    call cl 2>&1 | find "x64" >nul
+    if not errorlevel 1 (
+        echo x86-64 cl.exe detected.
+        set _target=x86-64
+        set _bootimage=boot.winnt-x86.64.image
+    ) else goto nocl
 )
 
-if "%1"=="/?" goto usage
-
-if "%1"=="" (
-    set _bootimage_version="latest"
-    set _git_branch=master
-)
-if "%1"=="latest" (
-    set _bootimage_version="latest"
-    set _git_branch=master
-)
-if "%1"=="clean" (
-    set _bootimage_version="clean"
+if %_bootimage_version%==clean (
     set _git_branch=clean-winnt-%_target%
+    set _bootimage_path=clean/winnt-%_target%
+) else (
+    set _git_branch=master
+    set _bootimage_path=latest
 )
 
-if not defined _bootimage_version goto usage
-
-echo Updating working copy...
-cmd /c "git pull http://factorcode.org/git/factor.git %_git_branch%"
-if not errorlevel 0 goto fail
+echo Updating working copy from %_git_branch%...
+call git pull http://factorcode.org/git/factor.git %_git_branch%
+if errorlevel 1 goto fail
 
 echo Building vm...
 nmake /nologo /f Nmakefile clean
-if not errorlevel 0 goto fail
+if errorlevel 1 goto fail
 nmake /nologo /f Nmakefile %_target%
-if not errorlevel 0 goto fail
+if errorlevel 1 goto fail
 
 echo Fetching %_bootimage_version% boot image...
-cscript /nologo build-support\http-get.vbs http://factorcode.org/images/%_bootimage_version%/%_bootimage% %_bootimage%
-if not errorlevel 0 goto fail
+cscript /nologo build-support\http-get.vbs http://factorcode.org/images/%_bootimage_path%/%_bootimage% %_bootimage%
+if errorlevel 1 goto fail
 
 echo Bootstrapping...
 .\factor.com -i=%_bootimage%
-if not errorlevel 0 goto fail
+if errorlevel 1 goto fail
+
+echo Copying fresh factor.image to factor.image.fresh.
+copy factor.image factor.image.fresh
+if errorlevel 1 goto fail
 
 echo Build complete.
-goto cleanup
+goto :EOF
 
 :fail
 echo Build failed.
-goto cleanup
+goto :EOF
 
-:wrong_dir
+:wrongdir
 echo build-support\factor.cmd must be run from the root of the Factor source tree.
-goto cleanup
+goto :EOF
+
+:nocl
+echo Unable to detect cl.exe target platform.
+echo Make sure you're running within the Visual Studio or Windows SDK environment.
+goto :EOF
 
 :usage
 echo Usage: build-support\factor.cmd [latest/clean]
@@ -65,10 +83,5 @@ echo     most recent factor build is downloaded. This is the default.
 echo     If clean is specified, then the working copy is updated to the
 echo     upstream "clean-winnt-*" branch corresponding to the current
 echo     platform and the corresponding boot image is downloaded.
-goto cleanup
+goto :EOF
 
-:cleanup
-set _target=
-set _bootimage=
-set _bootimage_version=
-set _git_branch=
