@@ -207,12 +207,15 @@ struct call_frame_scrubber {
 
 	void operator()(stack_frame *frame)
 	{
-		const code_block *compiled = parent->frame_code(frame);
+		cell return_address = parent->frame_offset(frame);
+		if(return_address == (cell)-1)
+			return;
+
+		code_block *compiled = parent->frame_code(frame);
 		gc_info *info = compiled->block_gc_info();
 
-		u32 return_address = (cell)FRAME_RETURN_ADDRESS(frame,parent) - (cell)compiled->entry_point();
+		assert(return_address < compiled->size());
 		int index = info->return_address_index(return_address);
-
 		if(index != -1)
 			ctx->scrub_stacks(info,index);
 	}
